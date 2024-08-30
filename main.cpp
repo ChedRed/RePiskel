@@ -9,10 +9,12 @@ struct deltadata { double fps; double now; double then; double deltime; };
 deltadata dtdata;
 
 struct vec2 { int x; int y; };
+struct fvec2 { float x; float y; };
 struct duo { int a; int b; };
 
+fvec2 mouse = {0,0};
 vec2 windowsize = {1000,650};
-duo margin = {100,100};
+duo margin = {200,200};
 
 int border = 10;
 SDL_FRect leftmargin = { 0,0,margin.a,windowsize.y };
@@ -26,25 +28,35 @@ int main() {
     SDL_SetWindowMinimumSize(window,800,500);
     std::cout << "Success! Initializing loop" << std::endl;
     while (loop) {
+
+        /* Clear renderer, get mouse pos, and update FPS */
+        SDL_SetRenderDrawColor(renderer, 127, 127, 127, 255);
+        SDL_RenderClear(renderer);
+        SDL_GetMouseState(&mouse.x, &mouse.y);
         dtdata.then = dtdata.now;
         dtdata.now = SDL_GetPerformanceCounter();
         dtdata.deltime = (dtdata.now - dtdata.then) / (double)SDL_GetPerformanceFrequency();
         dtdata.fps = (1/dtdata.deltime);
+
+
         while (SDL_PollEvent(&e) != 0){
             switch (e.type) {
+                case SDL_EVENT_QUIT:
+                    loop = false;
+                    break;
                 case SDL_EVENT_WINDOW_RESIZED:
                     SDL_GetWindowSize(window,&windowsize.x,&windowsize.y);
                     leftmargin.h=windowsize.y;
                     rightmargin.h=windowsize.y;
-                    SDL_RenderPresent(renderer);
+                    rightmargin.x = windowsize.x-margin.b;
             }
-            if (e.type == 256) loop = false;
         }
-        std::cout << dtdata.deltime << std::endl;
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Set color to red
-        SDL_RenderRect(renderer, &leftmargin);
-        SDL_RenderRect(renderer, &rightmargin);
+        SDL_SetRenderDrawColor(renderer, 29, 29, 29, 255);
+        SDL_RenderFillRect(renderer, &leftmargin);
+        SDL_RenderFillRect(renderer, &rightmargin);
         SDL_RenderPresent(renderer);
     }
-
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
     return 0; }
