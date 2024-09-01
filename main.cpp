@@ -1,7 +1,7 @@
 #include <iostream>
 #include <SDL3/SDL.h>
 #include <ft2build.h>
-#include <freetype/freetype.h>
+#include FT_FREETYPE_H
 
 
 /* SDL setup variables */
