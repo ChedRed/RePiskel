@@ -1,6 +1,7 @@
-Build command (macos):
+Build command (macos): cmake ../.. && make
+To build:
+- make a build directory in nogit
+- have the SDL3 and freetype dylibs in RePiskel/../../Libraries/Cached (it's weird, but it works)
+- have the SDL3 headers located in /opt/homebrew/include (I wish homebrew allowed you to install sdl3)
 
-`g++ main.cpp ../../Libraries/Cached/libSDL3.0.dylib ../../Libraries/Cached/libfreetype.6.dylib -Wl,-rpath,@executable_path/../Resources -o nogit/RePiskel.app/Contents/MacOS/repiskel`
-
-
-(Yea i'll use cmake at some point ¯\_(ツ)_/¯)
+(CMake is nightmarish to work with, but it works when it does ig ¯\_(ツ)_/¯)
