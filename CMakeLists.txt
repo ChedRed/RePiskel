@@ -11,9 +11,8 @@ set_target_properties(repiskel PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURC
 
 # Link libraries and include directories
 target_link_libraries(repiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/libSDL3.0.dylib)
-target_link_libraries(repiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/libfreetype.6.20.2.dylib)
+target_link_libraries(repiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/libSDL3_ttf.0.0.0.dylib)
 target_include_directories(repiskel PRIVATE /opt/homebrew/include)
-target_include_directories(repiskel PRIVATE /opt/homebrew/include/freetype2)
 
 
 # Make directories for macos app
@@ -24,8 +23,9 @@ file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/Contents/Resources)
 # Add basic files to macos app
 file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/info.plist DESTINATION ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/Contents)
 file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/icon.icns DESTINATION ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/Contents/Resources)
+file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/FreeSans.ttf DESTINATION ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/Contents/Resources)
 
 
 # Add resources to macos app
 file(COPY ${CMAKE_SOURCE_DIR}/../Cached/libSDL3.0.dylib DESTINATION ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/contents/Resources)
-configure_file(${CMAKE_SOURCE_DIR}/../Cached/libfreetype.6.20.2.dylib ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/contents/Resources/libfreetype.6.dylib COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/../Cached/libSDL3_ttf.0.0.0.dylib ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/contents/Resources/libSDL3_ttf.0.dylib COPYONLY)
