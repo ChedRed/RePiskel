@@ -1,4 +1,3 @@
-#include "SDL3/SDL_render.h"
 #include <iostream>
 #include <optional>
 #include <SDL3/SDL.h>
@@ -46,7 +45,7 @@ fvec2 resratio = { (resolution.x<resolution.y)?(float)resolution.x/resolution.y:
 fvec2 canvascenter = { (margin.a/2)+((windowsize.x-margin.b)/2), (22)+(((float)windowsize.y-8)/2) };
 SDL_FRect precanvas = { margin.a, 44, windowsize.x-margin.a-margin.b, (float)windowsize.y-52 };
 fvec2 canvasize = { resratio.x*((resolution.x<resolution.y)?precanvas.h:precanvas.w), resratio.y*((resolution.x>resolution.y)?precanvas.h:precanvas.w) };
-SDL_FRect canvas = { ((precanvas.w*resratio.x>precanvas.h*resratio.y)?margin.a+((precanvas.w*resratio.x)-(precanvas.h*resratio.y))/2:margin.a), ((precanvas.w*resratio.x>precanvas.h*resratio.y)?44:44+((precanvas.h*resratio.x)-(precanvas.w*resratio.y))/2), canvasize.x, canvasize.y};
+SDL_FRect canvas = { canvascenter.x-(canvasize.x/2), canvascenter.y-(canvasize.y/2), canvasize.x*zoom, canvasize.y*zoom };
 
 
 /* Diagnostic variables */
@@ -150,11 +149,11 @@ int main() {
                     canvascenter = (fvec2){ .x=(margin.a/2)+((windowsize.x-margin.b)/2), .y=(22)+(((float)windowsize.y-8)/2) };
                     precanvas = (SDL_FRect){ .x=margin.a, .y=44, .w=windowsize.x-margin.a-margin.b, .h=(float)windowsize.y-52 };
                     canvasize = (fvec2){ .x=resratio.x*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w)*zoom, .y=resratio.y*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w)*zoom };
-                    canvas = (SDL_FRect){ .x=(zoom<=1)?((precanvas.w*resratio.x>precanvas.h*resratio.y)?margin.a+((precanvas.w*resratio.x)-(precanvas.h*resratio.y))/2:margin.a)+(canvasize.x-(canvasize.x*zoom)):0, .y=(zoom<=1)?((precanvas.w*resratio.x>precanvas.h*resratio.y)?44:44+((precanvas.h*resratio.x)-(precanvas.w*resratio.y))/2)+(canvasize.y-(canvasize.y*zoom)):0, .w=canvasize.x*zoom, .h=canvasize.y*zoom};
+                    canvas = (SDL_FRect){ .x=(zoom<=1)?canvascenter.x-((canvasize.x*zoom)/2):(float)((canvasize.x>precanvas.w)?:0), .y=(zoom<=1)?canvascenter.y-((canvasize.y*zoom)/2):0, .w=canvasize.x*zoom, .h=canvasize.y*zoom};
                 case SDL_EVENT_MOUSE_WHEEL:
                     scroll.x = e.wheel.x;
                     scroll.y = e.wheel.y;
-                    zoom = (zoom+(scroll.y/100)>.1)?zoom+(scroll.y/100):.1;
+                    zoom = (float)((int)(((zoom+(scroll.y/100)>.1)?zoom+(scroll.y/100):.1)*1000))/1000;
                     precanvas = (SDL_FRect){ .x=margin.a, .y=44, .w=windowsize.x-margin.a-margin.b, .h=(float)windowsize.y-52 };
                     canvasize = (fvec2){ .x=resratio.x*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w), .y=resratio.y*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w) };
                     canvas = (SDL_FRect){ .x=(zoom<=1)?canvascenter.x-((canvasize.x*zoom)/2):(float)((canvasize.x>precanvas.w)?:0), .y=(zoom<=1)?canvascenter.y-((canvasize.y*zoom)/2):0, .w=canvasize.x*zoom, .h=canvasize.y*zoom};
