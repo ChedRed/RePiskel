@@ -1,3 +1,8 @@
+#include "SDL3/SDL_events.h"
+#include "SDL3/SDL_oldnames.h"
+#include "SDL3/SDL_timer.h"
+#include "SDL3/SDL_video.h"
+#include <cstddef>
 #include <iostream>
 #include <optional>
 #include <SDL3/SDL.h>
@@ -7,6 +12,7 @@
 /* SDL setup variables */
 SDL_Event e;
 bool loop = true;
+bool focus = true;
 
 
 /* New 'data types' */
@@ -36,6 +42,7 @@ SDL_FRect leftmargin = { 0, 0, margin.a, (float)windowsize.y };
 SDL_FRect rightmargin = { windowsize.x-margin.b, 0, margin.b, (float)windowsize.y };
 SDL_FRect bottomargin = { 0, 36, (float)windowsize.x, 8 };
 SDL_FRect topmargin = { 0, (float)windowsize.y-8, (float)windowsize.x, 8 };
+float oldzoom = 1;
 float zoom = 1;
 
 
@@ -126,8 +133,8 @@ int main() {
 
         /* Update mouse */
         SDL_GetMouseState(&mouse.x, &mouse.y);
-        if (scroll.x != 0) { scroll.x = 0; }
-        if (scroll.y != 0) { scroll.y = 0; }
+        scroll.x = 0;
+        scroll.y = 0;
 
 
         /* Poll inputs */
@@ -148,15 +155,35 @@ int main() {
                     topmargin.y = windowsize.y-8;
                     canvascenter = (fvec2){ .x=(margin.a/2)+((windowsize.x-margin.b)/2), .y=(22)+(((float)windowsize.y-8)/2) };
                     precanvas = (SDL_FRect){ .x=margin.a, .y=44, .w=windowsize.x-margin.a-margin.b, .h=(float)windowsize.y-52 };
-                    canvasize = (fvec2){ .x=resratio.x*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w)*zoom, .y=resratio.y*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w)*zoom };
+                    canvasize = (fvec2){ .x=resratio.x*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w), .y=resratio.y*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w) };
                     canvas = (SDL_FRect){ .x=(zoom<=1)?canvascenter.x-((canvasize.x*zoom)/2):(float)((canvasize.x>precanvas.w)?:0), .y=(zoom<=1)?canvascenter.y-((canvasize.y*zoom)/2):0, .w=canvasize.x*zoom, .h=canvasize.y*zoom};
                 case SDL_EVENT_MOUSE_WHEEL:
                     scroll.x = e.wheel.x;
                     scroll.y = e.wheel.y;
+                    if (!(mouse.x >= precanvas.x && mouse.x <= precanvas.x+precanvas.w && mouse.y >= precanvas.y && mouse.y <= precanvas.y + precanvas.h)) break;
                     zoom = (float)((int)(((zoom+(scroll.y/100)>.1)?zoom+(scroll.y/100):.1)*1000))/1000;
                     precanvas = (SDL_FRect){ .x=margin.a, .y=44, .w=windowsize.x-margin.a-margin.b, .h=(float)windowsize.y-52 };
                     canvasize = (fvec2){ .x=resratio.x*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w), .y=resratio.y*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w) };
-                    canvas = (SDL_FRect){ .x=(zoom<=1)?canvascenter.x-((canvasize.x*zoom)/2):(float)((canvasize.x>precanvas.w)?:0), .y=(zoom<=1)?canvascenter.y-((canvasize.y*zoom)/2):0, .w=canvasize.x*zoom, .h=canvasize.y*zoom};
+                    canvas = (SDL_FRect){ .x=canvas.x-mouse.x, .y=canvas.y-mouse.y, .w=canvas.w+(canvas.w*(oldzoom-zoom)), .h=canvas.h+(canvas.h*(oldzoom-zoom))};
+                    canvas.x *= zoom;
+                    canvas.y *= zoom;
+                    canvas.x += mouse.x;
+                    canvas.y += mouse.y;
+                    if (canvas.w>precanvas.w) {
+                        (canvas.x>precanvas.x)?canvas.x=precanvas.x:canvas.x;
+                        (canvas.x+canvas.w<precanvas.x+precanvas.w)?canvas.x=precanvas.x-(canvas.w-precanvas.w):canvas.x;
+                    }
+                    if (canvas.h>precanvas.h) {
+                        (canvas.y>precanvas.y)?canvas.y=precanvas.y:canvas.y;
+                        (canvas.y+canvas.h<precanvas.y+precanvas.h)?canvas.y=precanvas.y-(canvas.h-precanvas.h):canvas.y;
+                    }
+                    oldzoom = zoom;
+                case SDL_EVENT_WINDOW_FOCUS_GAINED:
+                    focus = true;
+                    break;
+                case SDL_EVENT_WINDOW_FOCUS_LOST:
+                    focus = false;
+                    break;
             }
         }
 
@@ -190,6 +217,10 @@ int main() {
 
         /* Push render content */
         SDL_RenderPresent(renderer);
+
+
+        /* Wait if unfocussed */
+        if (!focus) SDL_Delay((Uint32)100);
     }
 
 
