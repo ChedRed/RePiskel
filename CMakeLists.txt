@@ -34,6 +34,7 @@ file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/info.plist DESTINATION ${CMAKE_SOURCE_D
 file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/icon.icns DESTINATION ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/Contents/Resources)
 file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/FreeSans.ttf DESTINATION ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/Contents/Resources)
 file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/tools.bmp DESTINATION ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/Contents/Resources)
+file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/border.bmp DESTINATION ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/Contents/Resources)
 
 
 # Add resources to macos app

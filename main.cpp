@@ -1,4 +1,5 @@
 #include <vector>
+#include <string>
 #include <iostream>
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -27,6 +28,7 @@ SDL_FRect grid = { 0, 0, 8, 8 };
 /* Mouse setup variables */
 fvec2 mouse = { 0, 0 };
 fvec2 scroll = { 0, 0 };
+bool mousedowned = false;
 
 
 /* UI */
@@ -43,10 +45,11 @@ float zoom = 1;
 
 
 /* UI elements */
-SDL_FRect toolsrect = { 8, 44, 0, 0 };
-int currentool = 1;
+SDL_FRect toolsrect = { 8, 0, 0, 0 };
+int currentool = 0;
 SDL_FRect toolshoveredrect = { 0,0,48,48 };
 SDL_FRect toolselectedrect = { 0,0,48,48 };
+std::string toolnames[18] = {"Pen","Line","Eraser","Mirror","Dither","Lighten","Fill","Multi-Fill","","Rectangle","Circle","","Rectangle Select","Lasso Select","Magic Select","Grab","Gridlock","Pick Color"};
 
 
 /* Canvas */
@@ -103,8 +106,8 @@ int main() {
     SDL_Surface * pretitle = TTF_RenderText_Blended(font, "New Piskel", (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
     SDL_Texture * title = SDL_CreateTextureFromSurface(renderer, pretitle);
     SDL_GetTextureSize(title, &tirect.w, &tirect.h);
-    tirect.x = (int)(windowsize.x/2)-(int)(tirect.w/2);
-    tirect.y = 18-(int)(tirect.h/2);
+    tirect.x = ((float)windowsize.x/2)-((float)tirect.w/2);
+    tirect.y = 18-(tirect.h/2);
     SDL_DestroySurface(pretitle);
 
 
@@ -112,14 +115,23 @@ int main() {
     snprintf(tempath, sizeof(tempath), "%s%s", SDL_GetBasePath(), "../Resources/tools.bmp");
     SDL_Surface * pretools = SDL_LoadBMP(tempath);
     SDL_Texture * tools = SDL_CreateTextureFromSurface(renderer, pretools);
-    SDL_DestroySurface(pretools);
     SDL_GetTextureSize(tools, &toolsrect.w, &toolsrect.h);
-    toolsrect = (SDL_FRect){ .x=toolsrect.x, .y=toolsrect.y, .w=toolsrect.w*3, .h=toolsrect.h*3 };
+    toolsrect = (SDL_FRect){ .x=toolsrect.x, .y=((float)windowsize.y/2)-(toolsrect.w*2), .w=toolsrect.w*2, .h=toolsrect.h*2 };
+    toolshoveredrect = (SDL_FRect){ .x=0,.y=0,toolsrect.w/3,toolsrect.w/3 };
+    toolselectedrect = (SDL_FRect){ .x=0,.y=0,toolsrect.w/3,toolsrect.w/3 };
     SDL_SetTextureScaleMode(tools, SDL_SCALEMODE_NEAREST);
-
+    snprintf(tempath, sizeof(tempath), "%s%s", SDL_GetBasePath(), "../Resources/border.bmp");
+    SDL_Surface * pretoolsborder = SDL_LoadBMP(tempath);
+    SDL_Texture * toolsborder = SDL_CreateTextureFromSurface(renderer, pretoolsborder);
+    SDL_SetTextureScaleMode(toolsborder, SDL_SCALEMODE_NEAREST);
     SDL_Texture * canvastexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 16, 16);
     SDL_SetTextureScaleMode(canvastexture, SDL_SCALEMODE_NEAREST);
     sprites.push_back(canvastexture);
+
+
+    /* Remove unecessary data */
+    SDL_DestroySurface(pretoolsborder);
+    SDL_DestroySurface(pretools);
 
 
     /* Main loop */
@@ -168,7 +180,7 @@ int main() {
                     rightmargin.h = windowsize.y;
                     rightmargin.x = windowsize.x-margin.b;
                     nameborder.w = windowsize.x;
-                    tirect.x = (int)(windowsize.x/2)-(int)(tirect.w/2);
+                    tirect.x = ((float)windowsize.x/2)-((float)tirect.w/2);
                     bottomargin.w = windowsize.x;
                     topmargin.w = windowsize.x;
                     topmargin.y = windowsize.y-8;
@@ -184,10 +196,14 @@ int main() {
 
 
                     /* Reset canvas borders */
-                    upbar = (SDL_FRect){ .x=margin.a, .y=44, .w=precanvas.w, .h=((precanvas.h-canvas.h)/2>=0)?(precanvas.h-canvas.h)/2:0 };
-                    downbar = (SDL_FRect){ .x=margin.a, .y=(float)windowsize.y-8, .w=precanvas.w, .h=((precanvas.h-canvas.h)/2>=0)?-(precanvas.h-canvas.h)/2:0 };
-                    leftbar = (SDL_FRect){ .x=margin.a, .y=44, .w=((precanvas.w-canvas.w)/2>=0)?(precanvas.w-canvas.w)/2:0, .h=precanvas.h };
-                    rightbar = (SDL_FRect){ .x=margin.a, .y=44, .w=((precanvas.w-canvas.w)/2>=0)?-(precanvas.w-canvas.w)/2:0, .h=precanvas.h };
+                    upbar = (SDL_FRect){ .x=margin.a, .y=44, .w=precanvas.w, .h=canvas.y-precanvas.y };
+                    downbar = (SDL_FRect){ .x=margin.a, .y=(float)windowsize.y-8, .w=precanvas.w, .h=((canvas.y+canvas.h)-(precanvas.y+precanvas.h)) };
+                    leftbar = (SDL_FRect){ .x=margin.a, .y=44, .w=-((canvas.x+canvas.w)-(precanvas.x+precanvas.w)), .h=precanvas.h };
+                    rightbar = (SDL_FRect){ .x=margin.a+precanvas.w, .y=44, .w=((canvas.x+canvas.w)-(precanvas.x+precanvas.w)), .h=precanvas.h };
+
+
+                    /* Reset UI */
+                    toolsrect.y=((float)windowsize.y/2)-toolsrect.w;
 
 
                 /* Zoom canvas */
@@ -229,6 +245,12 @@ int main() {
                 case SDL_EVENT_WINDOW_FOCUS_LOST:
                     focus = false;
                     break;
+
+
+                /* Interact with UI */
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    if (!contained(mouse,toolsrect) | toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)]=="") break;
+                    currentool=((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3);
             }
         }
 
@@ -259,10 +281,13 @@ int main() {
 
         /* Render UI */
         SDL_SetRenderDrawColor(renderer, 68, 68, 68, 68);
-        if (contained(mouse, toolsrect)) {
-            toolselectedrect = (SDL_FRect){ .x=(float)((int)((mouse.x-toolsrect.x)/48)*48)+toolsrect.x, .y=(float)((int)((mouse.y-toolsrect.y)/48)*48)+toolsrect.y, .w=toolselectedrect.w, .h=toolselectedrect.h };
+        if (contained(mouse, toolsrect) && toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)] != "") {
+            toolselectedrect = (SDL_FRect){ .x=(float)((int)((mouse.x-toolsrect.x)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.x, .y=(float)((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.y, .w=toolselectedrect.w, .h=toolselectedrect.h };
             SDL_RenderFillRect(renderer, &toolselectedrect);
         }
+        toolshoveredrect.x=(currentool%3)*(toolsrect.w/3)+toolsrect.x;
+        toolshoveredrect.y=((int)(currentool/3))*(toolsrect.w/3)+toolsrect.y;
+        SDL_RenderTexture(renderer, toolsborder, NULL, &toolshoveredrect);
         SDL_RenderTexture(renderer, tools, NULL, &toolsrect);
 
 
