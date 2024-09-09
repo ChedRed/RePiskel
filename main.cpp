@@ -1,14 +1,5 @@
-#include "SDL3/SDL_blendmode.h"
-#include "SDL3/SDL_events.h"
-#include "SDL3/SDL_oldnames.h"
-#include "SDL3/SDL_render.h"
-#include "SDL3/SDL_surface.h"
-#include "SDL3/SDL_timer.h"
-#include "SDL3/SDL_video.h"
-#include <cmath>
-#include <cstddef>
+#include <vector>
 #include <iostream>
-#include <optional>
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
@@ -51,24 +42,40 @@ float oldzoom = 1;
 float zoom = 1;
 
 
+/* UI elements */
+SDL_FRect toolsrect = { 8, 44, 0, 0 };
+int currentool = 1;
+SDL_FRect toolshoveredrect = { 0,0,48,48 };
+SDL_FRect toolselectedrect = { 0,0,48,48 };
+
+
 /* Canvas */
 fvec2 resolution = { 0, 0 };
+fvec2 drawresolution = { 0, 0 };
 fvec2 resratio = { (resolution.x<resolution.y)?(float)resolution.x/resolution.y:1, (resolution.x>resolution.y)?(float)resolution.y/resolution.x:1 };
 fvec2 canvascenter = { (margin.a/2)+((windowsize.x-margin.b)/2), (22)+(((float)windowsize.y-8)/2) };
 SDL_FRect precanvas = { margin.a, 44, windowsize.x-margin.a-margin.b, (float)windowsize.y-52 };
+SDL_FRect oldprecanvas = precanvas;
 fvec2 canvasize = { resratio.x*((resolution.x<resolution.y)?precanvas.h:precanvas.w), resratio.y*((resolution.x>resolution.y)?precanvas.h:precanvas.w) };
+fvec2 oldcanvasize = canvasize;
 SDL_FRect canvas = { canvascenter.x-(canvasize.x/2), canvascenter.y-(canvasize.y/2), canvasize.x, canvasize.y };
+std::vector<SDL_Texture *> sprites;
+int frame = 0;
 
 
-/* Diagnostic variables */
-float maxdeltime = 0;
-float elapsedtime = 0;
-float averagefps = 0;
-int count = 1;
+/* Canvas borders */
+SDL_FRect upbar = { margin.a, 44, precanvas.w, (precanvas.h-canvas.h)/2 };
+SDL_FRect downbar = { margin.a, (float)windowsize.y-8, precanvas.w, -(precanvas.h-canvas.h)/2 };
+SDL_FRect leftbar = { margin.a, 44, (precanvas.w-canvas.w)/2, precanvas.h };
+SDL_FRect rightbar = { margin.a, 44, -(precanvas.w-canvas.w)/2, precanvas.h };
 
 
 /* Limit function */
-double limit(double value, std::optional<double> min, std::optional<double> max) { /* Not readable, but it's one line :D */ return ((min.has_value())?((max.has_value())?(value>max?max:(value<min?min:value)):(value<min?min:value)):(max.has_value())?(value>max?max:value):value).value(); }
+double limit(double value, double min = NULL, double max = NULL) { /* Not readable, but it's one line :D */ return ((min)?((max)?(value>max?max:(value<min?min:value)):(value<min?min:value)):(max)?(value>max?max:value):value); }
+
+
+/* Contained function */
+bool contained(fvec2 point, SDL_FRect container) { return point.x>container.x && point.y>container.y && point.x<container.x+container.w && point.y<container.y+container.h; }
 
 
 /* Main! */
@@ -87,9 +94,9 @@ int main() {
 
     /* Initialize SDL_ttf, create font object */
     TTF_Init();
-    char fontPath[256];
-    snprintf(fontPath, sizeof(fontPath), "%s%s", SDL_GetBasePath(), "../Resources/FreeSans.ttf");
-    TTF_Font * font = TTF_OpenFont(fontPath, 24);
+    char tempath[256];
+    snprintf(tempath, sizeof(tempath), "%s%s", SDL_GetBasePath(), "../Resources/FreeSans.ttf");
+    TTF_Font * font = TTF_OpenFont(tempath, 24);
 
 
     /* Create title text */
@@ -102,13 +109,17 @@ int main() {
 
 
     /* Load textures */
-    char texturepath[256];
-    snprintf(texturepath, sizeof(texturepath), "%s%s", SDL_GetBasePath(), "../Resources/test.bmp");
-    SDL_Surface * test = SDL_LoadBMP(texturepath);
-    SDL_Texture * testimg = SDL_CreateTextureFromSurface(renderer, test);
-    SDL_SetTextureScaleMode(testimg, SDL_SCALEMODE_NEAREST);
-    SDL_DestroySurface(test);
-    SDL_GetTextureSize(testimg, &resolution.x, &resolution.y);
+    snprintf(tempath, sizeof(tempath), "%s%s", SDL_GetBasePath(), "../Resources/tools.bmp");
+    SDL_Surface * pretools = SDL_LoadBMP(tempath);
+    SDL_Texture * tools = SDL_CreateTextureFromSurface(renderer, pretools);
+    SDL_DestroySurface(pretools);
+    SDL_GetTextureSize(tools, &toolsrect.w, &toolsrect.h);
+    toolsrect = (SDL_FRect){ .x=toolsrect.x, .y=toolsrect.y, .w=toolsrect.w*3, .h=toolsrect.h*3 };
+    SDL_SetTextureScaleMode(tools, SDL_SCALEMODE_NEAREST);
+
+    SDL_Texture * canvastexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 16, 16);
+    SDL_SetTextureScaleMode(canvastexture, SDL_SCALEMODE_NEAREST);
+    sprites.push_back(canvastexture);
 
 
     /* Main loop */
@@ -120,19 +131,6 @@ int main() {
         dtdata.now = SDL_GetPerformanceCounter();
         dtdata.deltime = (dtdata.now - dtdata.then) / (double)SDL_GetPerformanceFrequency();
         dtdata.fps = (1/dtdata.deltime);
-
-
-        /* Deltime diagnostics */
-        elapsedtime += dtdata.deltime;
-        averagefps = (count==1)?dtdata.fps:(((count-1.)/count)*averagefps)+((1./count)*dtdata.fps);
-        maxdeltime=(dtdata.deltime > maxdeltime)?dtdata.deltime:maxdeltime;
-        count++;
-        if (elapsedtime > 5){
-            elapsedtime = 0;
-            std::cout << "Highest frame time: " << maxdeltime << "\nAverage FPS: " << averagefps << std::endl;
-            maxdeltime = 0;
-            count = 1;
-        }
 
 
         /* Clear renderer and draw background grid */
@@ -158,8 +156,14 @@ int main() {
                 case SDL_EVENT_QUIT:
                     loop = false;
                     break;
+
+
+                /* Resize window */
                 case SDL_EVENT_WINDOW_RESIZED:
                     SDL_GetWindowSize(window, &windowsize.x, &windowsize.y);
+
+
+                    /* Reset ui */
                     leftmargin.h = windowsize.y;
                     rightmargin.h = windowsize.y;
                     rightmargin.x = windowsize.x-margin.b;
@@ -168,24 +172,38 @@ int main() {
                     bottomargin.w = windowsize.x;
                     topmargin.w = windowsize.x;
                     topmargin.y = windowsize.y-8;
-                    canvascenter = (fvec2){ .x=(margin.a/2)+((windowsize.x-margin.b)/2), .y=(22)+(((float)windowsize.y-8)/2) };
+
+
+                    /* Reset canvas */
                     precanvas = (SDL_FRect){ .x=margin.a, .y=44, .w=windowsize.x-margin.a-margin.b, .h=(float)windowsize.y-52 };
-                    // canvas = (SDL_FRect){ .x=((canvasize.x*zoom)<=precanvas.w)?canvascenter.x-(canvas.w/2):(canvas.x-mouse.x)+mouse.x, .y=((canvasize.y*zoom)<=precanvas.h)?canvascenter.y-(canvas.h/2):(canvas.y-mouse.y)+mouse.y, .w=canvas.w, .h=canvas.h };
-                    canvas = (SDL_FRect){ .x=0, .y=0, .w=canvas.w*(resratio.x*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w)/canvasize.x), .h=canvas.h*(resratio.y*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w)/canvasize.y) };
+                    canvascenter = (fvec2){ .x=(margin.a/2)+((windowsize.x-margin.b)/2), .y=22+(((float)windowsize.y-8)/2) };
                     canvasize = (fvec2){ .x=resratio.x*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w), .y=resratio.y*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w) };
+                    canvas = (SDL_FRect){ .x=canvas.x, .y=canvas.y, .w=canvas.w*(canvasize.x/oldcanvasize.x), .h=canvas.h*(canvasize.y/oldcanvasize.y) };
+                    oldprecanvas=precanvas;
+                    oldcanvasize=canvasize;
+
+
+                    /* Reset canvas borders */
+                    upbar = (SDL_FRect){ .x=margin.a, .y=44, .w=precanvas.w, .h=((precanvas.h-canvas.h)/2>=0)?(precanvas.h-canvas.h)/2:0 };
+                    downbar = (SDL_FRect){ .x=margin.a, .y=(float)windowsize.y-8, .w=precanvas.w, .h=((precanvas.h-canvas.h)/2>=0)?-(precanvas.h-canvas.h)/2:0 };
+                    leftbar = (SDL_FRect){ .x=margin.a, .y=44, .w=((precanvas.w-canvas.w)/2>=0)?(precanvas.w-canvas.w)/2:0, .h=precanvas.h };
+                    rightbar = (SDL_FRect){ .x=margin.a, .y=44, .w=((precanvas.w-canvas.w)/2>=0)?-(precanvas.w-canvas.w)/2:0, .h=precanvas.h };
 
 
                 /* Zoom canvas */
                 case SDL_EVENT_MOUSE_WHEEL:
+
+
+                    /* Reset scroll */
                     scroll.x = e.wheel.x;
                     scroll.y = e.wheel.y;
-                    if (!(mouse.x >= precanvas.x && mouse.x <= precanvas.x+precanvas.w && mouse.y >= precanvas.y && mouse.y <= precanvas.y + precanvas.h)) break;
+                    if (!contained(mouse, precanvas)) break;
                     zoom = (zoom+(scroll.y/100)>.1)?((true)?zoom+(scroll.y/100):oldzoom):.1;
+
+
+                    /* Reset canvas */
                     precanvas = (SDL_FRect){ .x=margin.a, .y=44, .w=windowsize.x-margin.a-margin.b, .h=(float)windowsize.y-52 };
                     canvas = (SDL_FRect){ .x=(canvas.w<precanvas.w)?canvascenter.x-((canvas.w*(1+zoom-oldzoom))/2):((canvas.x-mouse.x)*(1+zoom-oldzoom))+mouse.x, .y=(canvas.h<precanvas.h)?canvascenter.y-((canvas.h*(1+zoom-oldzoom))/2):((canvas.y-mouse.y)*(1+zoom-oldzoom))+mouse.y, .w=canvas.w*(1+zoom-oldzoom), .h=canvas.h*(1+zoom-oldzoom) };
-
-
-                    /* Guard rails for canvas zoom */
                     if (canvas.w>precanvas.w) {
                         (canvas.x>precanvas.x)?canvas.x=precanvas.x:canvas.x;
                         (canvas.x+canvas.w<precanvas.x+precanvas.w)?canvas.x=precanvas.x-(canvas.w-precanvas.w):canvas.x;
@@ -195,6 +213,13 @@ int main() {
                         (canvas.y+canvas.h<precanvas.y+precanvas.h)?canvas.y=precanvas.y-(canvas.h-precanvas.h):canvas.y;
                     }
                     oldzoom = zoom;
+
+
+                    /* Reset canvas borders */
+                    upbar = (SDL_FRect){ .x=margin.a, .y=44, .w=precanvas.w, .h=canvas.y-precanvas.y };
+                    downbar = (SDL_FRect){ .x=margin.a, .y=(float)windowsize.y-8, .w=precanvas.w, .h=((canvas.y+canvas.h)-(precanvas.y+precanvas.h)) };
+                    leftbar = (SDL_FRect){ .x=margin.a, .y=44, .w=-((canvas.x+canvas.w)-(precanvas.x+precanvas.w)), .h=precanvas.h };
+                    rightbar = (SDL_FRect){ .x=margin.a+precanvas.w, .y=44, .w=((canvas.x+canvas.w)-(precanvas.x+precanvas.w)), .h=precanvas.h };
 
 
                 /* Reduce FPS if unfocussed */
@@ -210,9 +235,12 @@ int main() {
 
         /* Render canvas */
         SDL_SetRenderDrawColor(renderer, 160, 160, 160, 255);
-        // SDL_RenderFillRect(renderer, &upleftbar);
-        // SDL_RenderFillRect(renderer, &downrightbar);
-        SDL_RenderTexture(renderer, testimg, NULL, &canvas);
+        SDL_RenderFillRect(renderer, &upbar);
+        SDL_RenderFillRect(renderer, &downbar);
+        SDL_RenderFillRect(renderer, &leftbar);
+        SDL_RenderFillRect(renderer, &rightbar);
+        // SDL_RenderFillRects(renderer, {&upbar, &downbar}, 4);
+        SDL_RenderTexture(renderer, sprites[frame], NULL, &canvas);
 
 
         /* Render margins */
@@ -227,6 +255,15 @@ int main() {
         SDL_SetRenderDrawColor(renderer, 29, 29, 29, 255);
         SDL_RenderFillRect(renderer, &bottomargin);
         SDL_RenderFillRect(renderer, &topmargin);
+
+
+        /* Render UI */
+        SDL_SetRenderDrawColor(renderer, 68, 68, 68, 68);
+        if (contained(mouse, toolsrect)) {
+            toolselectedrect = (SDL_FRect){ .x=(float)((int)((mouse.x-toolsrect.x)/48)*48)+toolsrect.x, .y=(float)((int)((mouse.y-toolsrect.y)/48)*48)+toolsrect.y, .w=toolselectedrect.w, .h=toolselectedrect.h };
+            SDL_RenderFillRect(renderer, &toolselectedrect);
+        }
+        SDL_RenderTexture(renderer, tools, NULL, &toolsrect);
 
 
         /* Render title text */
