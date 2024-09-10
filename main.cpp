@@ -45,6 +45,7 @@ float zoom = 1;
 
 
 /* UI elements */
+float toolsuiwidth = 96;
 SDL_FRect toolsrect = { 8, 0, 0, 0 };
 int currentool = 0;
 SDL_FRect toolshoveredrect = { 0,0,48,48 };
@@ -116,10 +117,9 @@ int main() {
     SDL_Surface * pretools = SDL_LoadBMP(tempath);
     SDL_Texture * tools = SDL_CreateTextureFromSurface(renderer, pretools);
     SDL_GetTextureSize(tools, &toolsrect.w, &toolsrect.h);
-    toolsrect = (SDL_FRect){ .x=toolsrect.x, .y=((float)windowsize.y/2)-(toolsrect.w*2), .w=toolsrect.w*2, .h=toolsrect.h*2 };
+    toolsrect = (SDL_FRect){ .x=toolsrect.x, .y=((float)windowsize.y/2)-(toolsrect.h/(toolsrect.h/toolsuiwidth)), .w=toolsuiwidth, .h=toolsuiwidth*(toolsrect.h/toolsrect.w) };
     toolshoveredrect = (SDL_FRect){ .x=0,.y=0,toolsrect.w/3,toolsrect.w/3 };
     toolselectedrect = (SDL_FRect){ .x=0,.y=0,toolsrect.w/3,toolsrect.w/3 };
-    SDL_SetTextureScaleMode(tools, SDL_SCALEMODE_NEAREST);
     snprintf(tempath, sizeof(tempath), "%s%s", SDL_GetBasePath(), "../Resources/border.bmp");
     SDL_Surface * pretoolsborder = SDL_LoadBMP(tempath);
     SDL_Texture * toolsborder = SDL_CreateTextureFromSurface(renderer, pretoolsborder);
