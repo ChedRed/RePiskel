@@ -1,4 +1,6 @@
+#include "SDL3/SDL_render.h"
 #include <vector>
+#include <optional>
 #include <string>
 #include <iostream>
 #include <SDL3/SDL.h>
@@ -29,11 +31,15 @@ SDL_FRect grid = { 0, 0, 8, 8 };
 fvec2 mouse = { 0, 0 };
 fvec2 scroll = { 0, 0 };
 bool mousedowned = false;
+fvec2 lastmouse = { 0,0 };
+fvec2 framelastmouse = { 0,0 };
+Uint32 mousebitmask;
+int cursize = 1;
 
 
 /* UI */
 duo margin = { 240, 260 };
-SDL_FRect tirect = { 0, 0, 0, 0 };
+SDL_FRect tirect;
 SDL_FRect nameborder = { 0, 0, (float)windowsize.x, 36 };
 SDL_FRect leftmargin = { 0, 0, margin.a, (float)windowsize.y };
 SDL_FRect rightmargin = { windowsize.x-margin.b, 0, margin.b, (float)windowsize.y };
@@ -51,10 +57,12 @@ int currentool = 0;
 SDL_FRect toolshoveredrect = { 0,0,48,48 };
 SDL_FRect toolselectedrect = { 0,0,48,48 };
 std::string toolnames[18] = {"Pen","Line","Eraser","Mirror","Dither","Lighten","Fill","Multi-Fill","","Rectangle","Circle","","Rectangle Select","Lasso Select","Magic Select","Grab","Gridlock","Pick Color"};
+SDL_FRect cursizerectborder;
+SDL_FRect cursizerect;
 
 
 /* Canvas */
-fvec2 resolution = { 0, 0 };
+fvec2 resolution = { 16, 16 };
 fvec2 drawresolution = { 0, 0 };
 fvec2 resratio = { (resolution.x<resolution.y)?(float)resolution.x/resolution.y:1, (resolution.x>resolution.y)?(float)resolution.y/resolution.x:1 };
 fvec2 canvascenter = { (margin.a/2)+((windowsize.x-margin.b)/2), (22)+(((float)windowsize.y-8)/2) };
@@ -63,7 +71,7 @@ SDL_FRect oldprecanvas = precanvas;
 fvec2 canvasize = { resratio.x*((resolution.x<resolution.y)?precanvas.h:precanvas.w), resratio.y*((resolution.x>resolution.y)?precanvas.h:precanvas.w) };
 fvec2 oldcanvasize = canvasize;
 SDL_FRect canvas = { canvascenter.x-(canvasize.x/2), canvascenter.y-(canvasize.y/2), canvasize.x, canvasize.y };
-std::vector<SDL_Texture *> sprites;
+std::vector<SDL_Texture *> sprite;
 int frame = 0;
 
 
@@ -74,8 +82,13 @@ SDL_FRect leftbar = { margin.a, 44, (precanvas.w-canvas.w)/2, precanvas.h };
 SDL_FRect rightbar = { margin.a, 44, -(precanvas.w-canvas.w)/2, precanvas.h };
 
 
+/* Canvas lock variables */
+void*pixels;
+int pitch;
+
+
 /* Limit function */
-double limit(double value, double min = NULL, double max = NULL) { /* Not readable, but it's one line :D */ return ((min)?((max)?(value>max?max:(value<min?min:value)):(value<min?min:value)):(max)?(value>max?max:value):value); }
+double limit(double value, std::optional<double> min, std::optional<double> max) { /* Not readable, but it's one line :D */ return ((min)?((max)?(value>max?max:(value<min?min:value)):(value<min?min:value)):(max)?(value>max?max:value):value).value(); }
 
 
 /* Contained function */
@@ -91,7 +104,7 @@ int main() {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_Window * window = SDL_CreateWindow("RePiskel", windowsize.x, windowsize.y, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_CAPTURE);
     SDL_Renderer * renderer = SDL_CreateRenderer(window, NULL);
-    SDL_SetWindowMinimumSize(window, 800, 450);
+    SDL_SetWindowMinimumSize(window, 832, 468);
     SDL_SetRenderVSync(renderer, 1);
     std::cout << "Success! Initializing loop" << std::endl;
 
@@ -120,13 +133,14 @@ int main() {
     toolsrect = (SDL_FRect){ .x=toolsrect.x, .y=((float)windowsize.y/2)-(toolsrect.h/(toolsrect.h/toolsuiwidth)), .w=toolsuiwidth, .h=toolsuiwidth*(toolsrect.h/toolsrect.w) };
     toolshoveredrect = (SDL_FRect){ .x=0,.y=0,toolsrect.w/3,toolsrect.w/3 };
     toolselectedrect = (SDL_FRect){ .x=0,.y=0,toolsrect.w/3,toolsrect.w/3 };
+    cursizerectborder = (SDL_FRect){ .x=toolsrect.x, .y=toolsrect.y, .w=toolsrect.w, .h=-toolsrect.w };
+    cursizerect = (SDL_FRect){ .x=toolsrect.x+4, .y=toolsrect.y-4, .w=toolsrect.w-8, .h=-toolsrect.w+8 };
     snprintf(tempath, sizeof(tempath), "%s%s", SDL_GetBasePath(), "../Resources/border.bmp");
     SDL_Surface * pretoolsborder = SDL_LoadBMP(tempath);
     SDL_Texture * toolsborder = SDL_CreateTextureFromSurface(renderer, pretoolsborder);
     SDL_SetTextureScaleMode(toolsborder, SDL_SCALEMODE_NEAREST);
-    SDL_Texture * canvastexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 16, 16);
-    SDL_SetTextureScaleMode(canvastexture, SDL_SCALEMODE_NEAREST);
-    sprites.push_back(canvastexture);
+    sprite.push_back(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, resolution.x, resolution.y));
+    SDL_SetTextureScaleMode(sprite[0], SDL_SCALEMODE_NEAREST);
 
 
     /* Remove unecessary data */
@@ -157,7 +171,7 @@ int main() {
 
 
         /* Update mouse */
-        SDL_GetMouseState(&mouse.x, &mouse.y);
+        mousebitmask = SDL_GetMouseState(&mouse.x, &mouse.y);
         scroll.x = 0;
         scroll.y = 0;
 
@@ -204,6 +218,8 @@ int main() {
 
                     /* Reset UI */
                     toolsrect.y=((float)windowsize.y/2)-toolsrect.w;
+                    cursizerectborder.y=toolsrect.y;
+                    cursizerect.y=toolsrect.y-4;
 
 
                 /* Zoom canvas */
@@ -247,11 +263,24 @@ int main() {
                     break;
 
 
-                /* Interact with UI */
+                /* Mouse use event */
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
-                    if (!contained(mouse,toolsrect) | toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)]=="") break;
-                    currentool=((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3);
+
+
+                    /* Interact with UI */
+                    if (contained(mouse,toolsrect) && !(toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)]=="")) currentool=((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3);
+                    if (contained(mouse,canvas)) lastmouse = mouse;
             }
+        }
+
+
+        /* Update canvas texture if necessary */
+        if (mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) {
+            SDL_LockTexture(sprite[frame], NULL, &pixels, &pitch);
+                if (currentool == 0) {
+                    /* Draw line from framelastmouse to mouse */
+                }
+            SDL_UnlockTexture(sprite[frame]);
         }
 
 
@@ -261,8 +290,7 @@ int main() {
         SDL_RenderFillRect(renderer, &downbar);
         SDL_RenderFillRect(renderer, &leftbar);
         SDL_RenderFillRect(renderer, &rightbar);
-        // SDL_RenderFillRects(renderer, {&upbar, &downbar}, 4);
-        SDL_RenderTexture(renderer, sprites[frame], NULL, &canvas);
+        SDL_RenderTexture(renderer, sprite[frame], NULL, &canvas);
 
 
         /* Render margins */
@@ -280,7 +308,7 @@ int main() {
 
 
         /* Render UI */
-        SDL_SetRenderDrawColor(renderer, 68, 68, 68, 68);
+        SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
         if (contained(mouse, toolsrect) && toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)] != "") {
             toolselectedrect = (SDL_FRect){ .x=(float)((int)((mouse.x-toolsrect.x)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.x, .y=(float)((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.y, .w=toolselectedrect.w, .h=toolselectedrect.h };
             SDL_RenderFillRect(renderer, &toolselectedrect);
@@ -289,6 +317,10 @@ int main() {
         toolshoveredrect.y=((int)(currentool/3))*(toolsrect.w/3)+toolsrect.y;
         SDL_RenderTexture(renderer, toolsborder, NULL, &toolshoveredrect);
         SDL_RenderTexture(renderer, tools, NULL, &toolsrect);
+        SDL_SetRenderDrawColor(renderer, 58, 58, 58, 255);
+        SDL_RenderFillRect(renderer, &cursizerectborder);
+        SDL_SetRenderDrawColor(renderer, 15, 15, 15, 255);
+        SDL_RenderFillRect(renderer, &cursizerect);
 
 
         /* Render title text */
@@ -297,6 +329,10 @@ int main() {
 
         /* Push render content */
         SDL_RenderPresent(renderer);
+
+
+        /* Update mouse variables */
+        framelastmouse = mouse;
 
 
         /* Wait if unfocussed */
