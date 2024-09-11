@@ -1,4 +1,3 @@
-#include "SDL3/SDL_render.h"
 #include <vector>
 #include <optional>
 #include <string>
@@ -34,7 +33,6 @@ bool mousedowned = false;
 fvec2 lastmouse = { 0,0 };
 fvec2 framelastmouse = { 0,0 };
 Uint32 mousebitmask;
-int cursize = 1;
 
 
 /* UI */
@@ -45,9 +43,6 @@ SDL_FRect leftmargin = { 0, 0, margin.a, (float)windowsize.y };
 SDL_FRect rightmargin = { windowsize.x-margin.b, 0, margin.b, (float)windowsize.y };
 SDL_FRect bottomargin = { 0, 36, (float)windowsize.x, 8 };
 SDL_FRect topmargin = { 0, (float)windowsize.y-8, (float)windowsize.x, 8 };
-float olderzoom = 1;
-float oldzoom = 1;
-float zoom = 1;
 
 
 /* UI elements */
@@ -57,8 +52,10 @@ int currentool = 0;
 SDL_FRect toolshoveredrect = { 0,0,48,48 };
 SDL_FRect toolselectedrect = { 0,0,48,48 };
 std::string toolnames[18] = {"Pen","Line","Eraser","Mirror","Dither","Lighten","Fill","Multi-Fill","","Rectangle","Circle","","Rectangle Select","Lasso Select","Magic Select","Grab","Gridlock","Pick Color"};
+SDL_FRect cursizerectinborder;
 SDL_FRect cursizerectborder;
 SDL_FRect cursizerect;
+float cursize = 1;
 
 
 /* Canvas */
@@ -82,17 +79,17 @@ SDL_FRect leftbar = { margin.a, 44, (precanvas.w-canvas.w)/2, precanvas.h };
 SDL_FRect rightbar = { margin.a, 44, -(precanvas.w-canvas.w)/2, precanvas.h };
 
 
-/* Canvas lock variables */
+/* Canvas drawing variables */
 void*pixels;
 int pitch;
 
 
 /* Limit function */
-double limit(double value, std::optional<double> min, std::optional<double> max) { /* Not readable, but it's one line :D */ return ((min)?((max)?(value>max?max:(value<min?min:value)):(value<min?min:value)):(max)?(value>max?max:value):value).value(); }
+double limit(double value, std::optional<double> min = NULL, std::optional<double> max = NULL) { return ((min!=NULL)?((max!=NULL)?(value>max?max:(value<min?min:value)):(value<min?min:value)):(max!=NULL)?(value>max?max:value):value).value(); }
 
 
 /* Contained function */
-bool contained(fvec2 point, SDL_FRect container) { return point.x>container.x && point.y>container.y && point.x<container.x+container.w && point.y<container.y+container.h; }
+bool contained(fvec2 point, SDL_FRect container) { return ((container.w>0)?point.x>container.x:point.x<container.x) && ((container.h>0)?point.y>container.y:point.y<container.y) && ((container.w>0)?point.x<container.x+container.w:point.x>container.x+container.w) && ((container.h>0)?point.y<container.y+container.h:point.y>container.y+container.h); }
 
 
 /* Main! */
@@ -104,7 +101,7 @@ int main() {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_Window * window = SDL_CreateWindow("RePiskel", windowsize.x, windowsize.y, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_CAPTURE);
     SDL_Renderer * renderer = SDL_CreateRenderer(window, NULL);
-    SDL_SetWindowMinimumSize(window, 832, 468);
+    SDL_SetWindowMinimumSize(window, 960, 540);
     SDL_SetRenderVSync(renderer, 1);
     std::cout << "Success! Initializing loop" << std::endl;
 
@@ -134,7 +131,7 @@ int main() {
     toolshoveredrect = (SDL_FRect){ .x=0,.y=0,toolsrect.w/3,toolsrect.w/3 };
     toolselectedrect = (SDL_FRect){ .x=0,.y=0,toolsrect.w/3,toolsrect.w/3 };
     cursizerectborder = (SDL_FRect){ .x=toolsrect.x, .y=toolsrect.y, .w=toolsrect.w, .h=-toolsrect.w };
-    cursizerect = (SDL_FRect){ .x=toolsrect.x+4, .y=toolsrect.y-4, .w=toolsrect.w-8, .h=-toolsrect.w+8 };
+    cursizerectinborder = (SDL_FRect){ .x=toolsrect.x+4, .y=toolsrect.y-4, .w=toolsrect.w-8, .h=-toolsrect.w+8 };
     snprintf(tempath, sizeof(tempath), "%s%s", SDL_GetBasePath(), "../Resources/border.bmp");
     SDL_Surface * pretoolsborder = SDL_LoadBMP(tempath);
     SDL_Texture * toolsborder = SDL_CreateTextureFromSurface(renderer, pretoolsborder);
@@ -219,39 +216,43 @@ int main() {
                     /* Reset UI */
                     toolsrect.y=((float)windowsize.y/2)-toolsrect.w;
                     cursizerectborder.y=toolsrect.y;
-                    cursizerect.y=toolsrect.y-4;
+                    cursizerectinborder.y=toolsrect.y-4;
 
 
                 /* Zoom canvas */
                 case SDL_EVENT_MOUSE_WHEEL:
 
-
                     /* Reset scroll */
                     scroll.x = e.wheel.x;
                     scroll.y = e.wheel.y;
-                    if (!contained(mouse, precanvas)) break;
-                    zoom = (zoom+(scroll.y/100)>.1)?((true)?zoom+(scroll.y/100):oldzoom):.1;
 
 
                     /* Reset canvas */
-                    precanvas = (SDL_FRect){ .x=margin.a, .y=44, .w=windowsize.x-margin.a-margin.b, .h=(float)windowsize.y-52 };
-                    canvas = (SDL_FRect){ .x=(canvas.w<precanvas.w)?canvascenter.x-((canvas.w*(1+zoom-oldzoom))/2):((canvas.x-mouse.x)*(1+zoom-oldzoom))+mouse.x, .y=(canvas.h<precanvas.h)?canvascenter.y-((canvas.h*(1+zoom-oldzoom))/2):((canvas.y-mouse.y)*(1+zoom-oldzoom))+mouse.y, .w=canvas.w*(1+zoom-oldzoom), .h=canvas.h*(1+zoom-oldzoom) };
-                    if (canvas.w>precanvas.w) {
-                        (canvas.x>precanvas.x)?canvas.x=precanvas.x:canvas.x;
-                        (canvas.x+canvas.w<precanvas.x+precanvas.w)?canvas.x=precanvas.x-(canvas.w-precanvas.w):canvas.x;
-                    }
-                    if (canvas.h>precanvas.h) {
-                        (canvas.y>precanvas.y)?canvas.y=precanvas.y:canvas.y;
-                        (canvas.y+canvas.h<precanvas.y+precanvas.h)?canvas.y=precanvas.y-(canvas.h-precanvas.h):canvas.y;
-                    }
-                    oldzoom = zoom;
+                    if (contained(mouse, precanvas)){
+                        precanvas = (SDL_FRect){ .x=margin.a, .y=44, .w=windowsize.x-margin.a-margin.b, .h=(float)windowsize.y-52 };
+                        canvas = (SDL_FRect){ .x=(canvas.w<precanvas.w)?canvascenter.x-((canvas.w*(1+(scroll.y/100)))/2):((canvas.x-mouse.x)*(1+(scroll.y/100)))+mouse.x, .y=(canvas.h<precanvas.h)?canvascenter.y-((canvas.h*(1+(scroll.y/100)))/2):((canvas.y-mouse.y)*(1+(scroll.y/100)))+mouse.y, .w=canvas.w*(1+(scroll.y/100)), .h=canvas.h*(1+(scroll.y/100)) };
+                        if (canvas.w>precanvas.w) {
+                            (canvas.x>precanvas.x)?canvas.x=precanvas.x:canvas.x;
+                            (canvas.x+canvas.w<precanvas.x+precanvas.w)?canvas.x=precanvas.x-(canvas.w-precanvas.w):canvas.x;
+                        }
+                        if (canvas.h>precanvas.h) {
+                            (canvas.y>precanvas.y)?canvas.y=precanvas.y:canvas.y;
+                            (canvas.y+canvas.h<precanvas.y+precanvas.h)?canvas.y=precanvas.y-(canvas.h-precanvas.h):canvas.y;
+                        }
 
 
-                    /* Reset canvas borders */
-                    upbar = (SDL_FRect){ .x=margin.a, .y=44, .w=precanvas.w, .h=canvas.y-precanvas.y };
-                    downbar = (SDL_FRect){ .x=margin.a, .y=(float)windowsize.y-8, .w=precanvas.w, .h=((canvas.y+canvas.h)-(precanvas.y+precanvas.h)) };
-                    leftbar = (SDL_FRect){ .x=margin.a, .y=44, .w=-((canvas.x+canvas.w)-(precanvas.x+precanvas.w)), .h=precanvas.h };
-                    rightbar = (SDL_FRect){ .x=margin.a+precanvas.w, .y=44, .w=((canvas.x+canvas.w)-(precanvas.x+precanvas.w)), .h=precanvas.h };
+                        /* Reset canvas borders */
+                        upbar = (SDL_FRect){ .x=margin.a, .y=44, .w=precanvas.w, .h=canvas.y-precanvas.y };
+                        downbar = (SDL_FRect){ .x=margin.a, .y=(float)windowsize.y-8, .w=precanvas.w, .h=((canvas.y+canvas.h)-(precanvas.y+precanvas.h)) };
+                        leftbar = (SDL_FRect){ .x=margin.a, .y=44, .w=-((canvas.x+canvas.w)-(precanvas.x+precanvas.w)), .h=precanvas.h };
+                        rightbar = (SDL_FRect){ .x=margin.a+precanvas.w, .y=44, .w=((canvas.x+canvas.w)-(precanvas.x+precanvas.w)), .h=precanvas.h };
+                    }
+
+
+                    /* Reset pen size */
+                    if (contained(mouse, cursizerectborder)){
+                        cursize=limit(cursize+(scroll.y/10),1);
+                    }
 
 
                 /* Reduce FPS if unfocussed */
@@ -320,6 +321,9 @@ int main() {
         SDL_SetRenderDrawColor(renderer, 58, 58, 58, 255);
         SDL_RenderFillRect(renderer, &cursizerectborder);
         SDL_SetRenderDrawColor(renderer, 15, 15, 15, 255);
+        SDL_RenderFillRect(renderer, &cursizerectinborder);
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        cursizerect = (SDL_FRect){ .x=(float)limit(-((canvas.w/resolution.x)*(int)cursize)/2+cursizerectborder.x+(cursizerectborder.w/2),cursizerectinborder.x), .y=(float)limit(-((canvas.h/resolution.y)*(int)cursize)/2+cursizerectborder.y+(cursizerectborder.h/2),cursizerectinborder.y), .w=(float)limit(canvas.w/resolution.x*(int)cursize,NULL,cursizerectinborder.w), .h=(float)limit((canvas.h/resolution.y)*(int)cursize,NULL,cursizerectinborder.h) };
         SDL_RenderFillRect(renderer, &cursizerect);
 
 
