@@ -323,8 +323,12 @@ int main() {
         SDL_SetRenderDrawColor(renderer, 15, 15, 15, 255);
         SDL_RenderFillRect(renderer, &cursizerectinborder);
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        cursizerect = (SDL_FRect){ .x=(float)limit(-((canvas.w/resolution.x)*(int)cursize)/2+cursizerectborder.x+(cursizerectborder.w/2),cursizerectinborder.x), .y=(float)limit(-((canvas.h/resolution.y)*(int)cursize)/2+cursizerectborder.y+(cursizerectborder.h/2),cursizerectinborder.y), .w=(float)limit(canvas.w/resolution.x*(int)cursize,NULL,cursizerectinborder.w), .h=(float)limit((canvas.h/resolution.y)*(int)cursize,NULL,cursizerectinborder.h) };
+        cursizerect = (SDL_FRect){ .x=(float)limit(-((canvas.w/resolution.x)*(int)cursize)/2+cursizerectborder.x+(cursizerectborder.w/2),cursizerectinborder.x), .y=(float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize),NULL,cursizerectinborder.y), .w=(float)limit(canvas.w/resolution.x*(int)cursize,NULL,cursizerectinborder.w), .h=-(float)limit(canvas.h/resolution.y*(int)cursize,NULL,-cursizerectinborder.h) };
         SDL_RenderFillRect(renderer, &cursizerect);
+
+
+        /* Render UI text */
+
 
 
         /* Render title text */
