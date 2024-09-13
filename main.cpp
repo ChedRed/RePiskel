@@ -1,3 +1,4 @@
+#include <ostream>
 #include <vector>
 #include <optional>
 #include <string>
@@ -56,6 +57,7 @@ SDL_FRect cursizerectinborder;
 SDL_FRect cursizerectborder;
 SDL_FRect cursizerect;
 float cursize = 1;
+SDL_FRect cursizetextrect;
 
 
 /* Canvas */
@@ -138,6 +140,11 @@ int main() {
     SDL_SetTextureScaleMode(toolsborder, SDL_SCALEMODE_NEAREST);
     sprite.push_back(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, resolution.x, resolution.y));
     SDL_SetTextureScaleMode(sprite[0], SDL_SCALEMODE_NEAREST);
+    SDL_Surface * tempcursizetextrect = TTF_RenderText_Blended(font, "1x", (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
+    SDL_Texture * cursizetextrecture = SDL_CreateTextureFromSurface(renderer, tempcursizetextrect);
+    SDL_DestroySurface(tempcursizetextrect);
+    SDL_GetTextureSize(cursizetextrecture, &cursizetextrect.w, &cursizetextrect.h);
+    cursizetextrect = (SDL_FRect){ .x=cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2), .y=cursizerectborder.y+cursizerectborder.h-cursizetextrect.h, .w=cursizetextrect.w, .h=cursizetextrect.h };
 
 
     /* Remove unecessary data */
@@ -219,6 +226,10 @@ int main() {
                     cursizerectinborder.y=toolsrect.y-4;
 
 
+                    /* Reset pen size text */
+                    cursizetextrect = (SDL_FRect){ .x=cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2), .y=cursizerectborder.y+cursizerectborder.h-cursizetextrect.h, .w=cursizetextrect.w, .h=cursizetextrect.h };
+
+
                 /* Zoom canvas */
                 case SDL_EVENT_MOUSE_WHEEL:
 
@@ -251,8 +262,24 @@ int main() {
 
                     /* Reset pen size */
                     if (contained(mouse, cursizerectborder)){
+                        if ((int)cursize!=(int)limit(cursize+(scroll.y/10),1)){
+                            SDL_DestroyTexture(cursizetextrecture);
+                            char tempchar[256];
+                            snprintf(tempchar, sizeof(tempchar), "%d%s", ((int)limit(cursize+(scroll.y/10),1)), "x");
+                            tempcursizetextrect = TTF_RenderText_Blended(font, tempchar, (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
+                            cursizetextrecture = SDL_CreateTextureFromSurface(renderer, tempcursizetextrect);
+                            SDL_GetTextureSize(cursizetextrecture, &cursizetextrect.w, &cursizetextrect.h);
+                            SDL_DestroySurface(tempcursizetextrect);
+                            remove(tempchar);
+                        }
                         cursize=limit(cursize+(scroll.y/10),1);
+
+
+                        /* Reset pen size text */
+                        cursizetextrect = (SDL_FRect){ .x=cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2), .y=cursizerectborder.y+cursizerectborder.h-cursizetextrect.h, .w=cursizetextrect.w, .h=cursizetextrect.h };
                     }
+
+
 
 
                 /* Reduce FPS if unfocussed */
@@ -328,7 +355,7 @@ int main() {
 
 
         /* Render UI text */
-
+        SDL_RenderTexture(renderer, cursizetextrecture, NULL, &cursizetextrect);
 
 
         /* Render title text */
@@ -344,7 +371,7 @@ int main() {
 
 
         /* Wait if unfocussed */
-        if (!focus) SDL_Delay((Uint32)100);
+        if (!focus) SDL_Delay((Uint32)1000);
     }
 
 
