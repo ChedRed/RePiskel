@@ -1,3 +1,11 @@
+#include "SDL3/SDL_blendmode.h"
+#include "SDL3/SDL_events.h"
+#include "SDL3/SDL_keyboard.h"
+#include "SDL3/SDL_mouse.h"
+#include "SDL3/SDL_rect.h"
+#include "SDL3/SDL_render.h"
+#include "SDL3/SDL_scancode.h"
+#include "SDL3/SDL_video.h"
 #include <ostream>
 #include <vector>
 #include <optional>
@@ -27,13 +35,14 @@ SDL_Color gridC = { .r=76, .g=76, .b=76, .a=255 };
 SDL_FRect grid = { 0, 0, 8, 8 };
 
 
-/* Mouse setup variables */
+/* Input setup variables */
 fvec2 mouse = { 0, 0 };
 fvec2 scroll = { 0, 0 };
 bool mousedowned = false;
 fvec2 lastmouse = { 0,0 };
 fvec2 framelastmouse = { 0,0 };
 Uint32 mousebitmask;
+const Uint8 * keystates = SDL_GetKeyboardState(NULL);
 
 
 /* UI */
@@ -70,7 +79,9 @@ SDL_FRect oldprecanvas = precanvas;
 fvec2 canvasize = { resratio.x*((resolution.x<resolution.y)?precanvas.h:precanvas.w), resratio.y*((resolution.x>resolution.y)?precanvas.h:precanvas.w) };
 fvec2 oldcanvasize = canvasize;
 SDL_FRect canvas = { canvascenter.x-(canvasize.x/2), canvascenter.y-(canvasize.y/2), canvasize.x, canvasize.y };
+SDL_Texture * presprite;
 std::vector<SDL_Texture *> sprite;
+SDL_FRect spriterect;
 int frame = 0;
 SDL_FRect canvasposrect = { 0, 0, 0, 0 };
 
@@ -85,6 +96,8 @@ SDL_FRect rightbar = { margin.a, 44, -(precanvas.w-canvas.w)/2, precanvas.h };
 /* Canvas drawing variables */
 void*pixels;
 int pitch;
+SDL_Color leftcolor = (SDL_Color){ .r=0, .g=0, .b=0, .a=255 };
+SDL_Color rightcolor = (SDL_Color){ .r=0, .g=0, .b=0, .a=0 };
 
 
 /* Limit function */
@@ -95,22 +108,13 @@ double limit(double value, std::optional<double> min = NULL, std::optional<doubl
 bool contained(fvec2 point, SDL_FRect container) { return ((container.w>0)?point.x>container.x:point.x<container.x) && ((container.h>0)?point.y>container.y:point.y<container.y) && ((container.w>0)?point.x<container.x+container.w:point.x>container.x+container.w) && ((container.h>0)?point.y<container.y+container.h:point.y>container.y+container.h); }
 
 
-/* Create text-ure */
-void newtext_ure(SDL_Renderer * renderer, SDL_Texture * texture, TTF_Font * font, char text[256]) {
-    SDL_DestroyTexture(texture);
-    SDL_Surface * tempsurface = TTF_RenderText_Blended(font, text, (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
-    texture = SDL_CreateTextureFromSurface(renderer, tempsurface);
-    SDL_DestroySurface(tempsurface);
-}
-
-
 /* Main! */
 int main() {
 
     /* Initialize SDL, create window and renderer */
     std::cout << "Initializing SDL3" << std::endl;
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window * window = SDL_CreateWindow("RePiskel", windowsize.x, windowsize.y, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_CAPTURE | SDL_WINDOW_TRANSPARENT);
+    SDL_Window * window = SDL_CreateWindow("RePiskel", windowsize.x, windowsize.y, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MOUSE_CAPTURE);
     SDL_Renderer * renderer = SDL_CreateRenderer(window, NULL);
     SDL_SetWindowMinimumSize(window, 960, 540);
     SDL_SetRenderVSync(renderer, -1);
@@ -149,7 +153,11 @@ int main() {
     SDL_Texture * toolsborder = SDL_CreateTextureFromSurface(renderer, pretoolsborder);
     SDL_SetTextureScaleMode(toolsborder, SDL_SCALEMODE_NEAREST);
     sprite.push_back(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, resolution.x, resolution.y));
+    presprite = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, resolution.x, resolution.y);
     SDL_SetTextureScaleMode(sprite[0], SDL_SCALEMODE_NEAREST);
+    SDL_SetTextureScaleMode(presprite, SDL_SCALEMODE_NEAREST);
+    SDL_GetTextureSize(presprite, &spriterect.w, &spriterect.h);
+    spriterect = (SDL_FRect){ .x=0, .y=0, .w=spriterect.w, .h=spriterect.h };
     SDL_Surface * tempcursizetextrect = TTF_RenderText_Blended(font, "1x", (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
     SDL_Texture * cursizetextrecture = SDL_CreateTextureFromSurface(renderer, tempcursizetextrect);
     SDL_DestroySurface(tempcursizetextrect);
@@ -249,7 +257,7 @@ int main() {
 
 
                     /* Reset canvas */
-                    if (contained(mouse, precanvas)){
+                    if (keystates[SDL_SCANCODE_LCTRL]){
                         precanvas = (SDL_FRect){ .x=margin.a, .y=44, .w=windowsize.x-margin.a-margin.b, .h=(float)windowsize.y-52 };
                         canvas = (SDL_FRect){ .x=(canvas.w<precanvas.w)?canvascenter.x-((canvas.w*(1+(scroll.y/100)))/2):((canvas.x-mouse.x)*(1+(scroll.y/100)))+mouse.x, .y=(canvas.h<precanvas.h)?canvascenter.y-((canvas.h*(1+(scroll.y/100)))/2):((canvas.y-mouse.y)*(1+(scroll.y/100)))+mouse.y, .w=canvas.w*(1+(scroll.y/100)), .h=canvas.h*(1+(scroll.y/100)) };
                         if (canvas.w>precanvas.w) {
@@ -271,14 +279,14 @@ int main() {
 
 
                     /* Reset pen size */
-                    if (contained(mouse, cursizerectborder)){
+                    else{
                         if ((int)cursize!=(int)limit(cursize+(scroll.y/10),1)){
                             SDL_DestroyTexture(cursizetextrecture);
                             char tempchar[256];
                             snprintf(tempchar, sizeof(tempchar), "%d%s", ((int)limit(cursize+(scroll.y/10),1)), "x");
-                            // tempcursizetextrect = TTF_RenderText_Blended(font, tempchar, (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
-                            // cursizetextrecture = SDL_CreateTextureFromSurface(renderer, tempcursizetextrect);
-                            newtext_ure(renderer, cursizetextrecture, font, tempchar);
+                            tempcursizetextrect = TTF_RenderText_Blended(font, tempchar, (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
+                            cursizetextrecture = SDL_CreateTextureFromSurface(renderer, tempcursizetextrect);
+                            SDL_DestroySurface(tempcursizetextrect);
                             SDL_GetTextureSize(cursizetextrecture, &cursizetextrect.w, &cursizetextrect.h);
                             SDL_DestroySurface(tempcursizetextrect);
                             remove(tempchar);
@@ -306,39 +314,95 @@ int main() {
 
                     /* Interact with UI */
                     if (contained(mouse,toolsrect) && !(toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)]=="")) currentool=((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3);
-                    if (contained(mouse,canvas)) lastmouse = mouse;
+                    lastmouse = mouse;
+
+
+                case SDL_EVENT_MOUSE_BUTTON_UP:
+                    if (currentool == 1 && contained(lastmouse, canvas)){
+                        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+                        SDL_SetRenderTarget(renderer, sprite[frame]);
+                        (mousebitmask & SDL_BUTTON_LMASK)?SDL_SetRenderDrawColor(renderer, leftcolor.r, leftcolor.g, leftcolor.b, leftcolor.a):SDL_SetRenderDrawColor(renderer, rightcolor.r, rightcolor.g, rightcolor.b, rightcolor.a);
+                        for (int y = 0; y < (int)cursize; y++) {
+                            for (int x = 0; x < (int)cursize; x++) {
+                                SDL_RenderLine(renderer, (int)(((lastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((lastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y);
+                            }
+                        }
+                        SDL_SetRenderTarget(renderer, NULL);
+                        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+                    }
             }
         }
 
 
         /* Update canvas texture if necessary */
-        if (mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) {
-            SDL_LockTexture(sprite[frame], NULL, &pixels, &pitch);
+        if ((mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && contained(lastmouse, canvas)) {
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
 
                 /* Draw line from framelastmouse to mouse */
                 if (currentool == 0) {
                     SDL_SetRenderTarget(renderer, sprite[frame]);
-                    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-                    SDL_RenderLine(renderer, (int)((framelastmouse.x-canvas.x)/(canvas.w/resolution.x)), (int)((framelastmouse.y-canvas.y)/(canvas.h/resolution.y)), (int)((mouse.x-canvas.x)/(canvas.w/resolution.x)), (int)((mouse.y-canvas.y)/(canvas.h/resolution.y)));
+                    (mousebitmask & SDL_BUTTON_LMASK)?SDL_SetRenderDrawColor(renderer, leftcolor.r, leftcolor.g, leftcolor.b, leftcolor.a):SDL_SetRenderDrawColor(renderer, rightcolor.r, rightcolor.g, rightcolor.b, rightcolor.a);
+                    for (int y = 0; y < (int)cursize; y++) {
+                        for (int x = 0; x < (int)cursize; x++) {
+                            SDL_RenderLine(renderer, (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y);
+                        }
+                    }
                     SDL_SetRenderTarget(renderer, NULL);
                 }
-            SDL_UnlockTexture(sprite[frame]);
+
+
+                /* Draw line from lastmouse to mouse */
+                else if (currentool == 1) {
+                    SDL_SetRenderTarget(renderer, presprite);
+                    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+                    SDL_RenderClear(renderer);
+                    SDL_SetRenderDrawColor(renderer, 160, 215, 240, 153);
+                    for (int y = 0; y < (int)cursize; y++) {
+                        for (int x = 0; x < (int)cursize; x++) {
+                            SDL_RenderLine(renderer, (int)(((lastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((lastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y);
+                        }
+                    }
+                    SDL_SetRenderTarget(renderer, NULL);
+                }
+
+
+                /* Erase from framelastmouse to mouse */
+                else if (currentool == 2) {
+                    SDL_SetRenderTarget(renderer, sprite[frame]);
+                    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+                    for (int y = 0; y < (int)cursize; y++) {
+                        for (int x = 0; x < (int)cursize; x++) {
+                            SDL_RenderLine(renderer, (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, (int)((mouse.x-canvas.x)/(canvas.w/resolution.x)), (int)((mouse.y-canvas.y)/(canvas.h/resolution.y)));
+                        }
+                    }
+                    SDL_SetRenderTarget(renderer, NULL);
+                }
+
+
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         }
 
 
         /* Render canvas */
+        SDL_RenderTexture(renderer, sprite[frame], NULL, &canvas);
+        if ((mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && currentool == 1 && contained(lastmouse, canvas)) {
+            SDL_RenderTexture(renderer, presprite, NULL, &canvas);
+            SDL_SetRenderTarget(renderer, presprite);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+            SDL_RenderClear(renderer);
+            SDL_SetRenderTarget(renderer, NULL);
+        }
+        if (contained(mouse, canvas) && !(mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK)){
+            canvasposrect = (SDL_FRect){ .x=((int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))*(canvas.w/resolution.x))+canvas.x, .y=((int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))*(canvas.h/resolution.y))+canvas.y, .w=(canvas.w/resolution.x)*(int)cursize, .h=(canvas.h/resolution.y)*(int)cursize };
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 51);
+            SDL_RenderFillRect(renderer, &canvasposrect);
+        }
         SDL_SetRenderDrawColor(renderer, 160, 160, 160, 255);
         SDL_RenderFillRect(renderer, &upbar);
         SDL_RenderFillRect(renderer, &downbar);
         SDL_RenderFillRect(renderer, &leftbar);
         SDL_RenderFillRect(renderer, &rightbar);
-        SDL_RenderTexture(renderer, sprite[frame], NULL, &canvas);
-        if (contained(mouse, canvas)){
-            canvasposrect = (SDL_FRect){ .x=((int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))*(canvas.w/resolution.x))+canvas.x, .y=((int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))*(canvas.h/resolution.y))+canvas.y, .w=(canvas.w/resolution.x)*(int)cursize, .h=(canvas.h/resolution.y)*(int)cursize };
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 51);
-            SDL_RenderFillRect(renderer, &canvasposrect);
-        }
 
 
         /* Render margins */
