@@ -1,3 +1,7 @@
+#include "SDL3/SDL_events.h"
+#include "SDL3/SDL_keycode.h"
+#include "SDL3/SDL_mouse.h"
+#include "SDL3/SDL_scancode.h"
 #include <cmath>
 #include <vector>
 #include <optional>
@@ -57,18 +61,13 @@ fvec2 canvasize = { resratio.x*((resolution.x<resolution.y)?precanvas.h:precanva
 fvec2 oldcanvasize = canvasize;
 SDL_FRect canvas = { canvascenter.x-(canvasize.x/2), canvascenter.y-(canvasize.y/2), canvasize.x, canvasize.y };
 SDL_Texture * presprite;
-std::vector<SDL_Texture *> sprite;
+void* prespritepixels;
+int prespritepitch;
+std::vector<SDL_Texture * > sprite;
 SDL_Texture * cursorture;
 SDL_FRect cursorturect = { 0, 0, 1, 1 };
 SDL_FRect spriterect;
 int frame = 0;
-
-
-/* Canvas borders */
-SDL_FRect upbar = { margin.a, 44, precanvas.w, (precanvas.h-canvas.h)/2 };
-SDL_FRect downbar = { margin.a, (float)windowsize.y-8, precanvas.w, -(precanvas.h-canvas.h)/2 };
-SDL_FRect leftbar = { margin.a, 44, (precanvas.w-canvas.w)/2, precanvas.h };
-SDL_FRect rightbar = { margin.a, 44, -(precanvas.w-canvas.w)/2, precanvas.h };
 
 
 /* Canvas drawing variables */
@@ -76,6 +75,14 @@ void*pixels;
 int pitch;
 SDL_Color leftcolor = (SDL_Color){ .r=0, .g=0, .b=0, .a=255 };
 SDL_Color rightcolor = (SDL_Color){ .r=0, .g=0, .b=0, .a=0 };
+
+
+/* Undo variables */
+int unlimit = 256;
+std::vector<std::vector<SDL_Texture * > > undotextures;
+bool resizeundo = false;
+bool undupdatequeueda = false;
+bool undupdatequeuedb = false;
 
 
 /* UI elements */
@@ -112,6 +119,9 @@ SDL_Vertex rightcolorpreview[] = {
     {{selectedcolorealrect.x+selectedcolorealrect.w,selectedcolorealrect.y+selectedcolorealrect.h}, {(float)rightcolor.r/255,(float)rightcolor.g/255,(float)rightcolor.b/255,1}, {0,0}},
     {{selectedcolorealrect.x,selectedcolorealrect.y+selectedcolorealrect.y}, {(float)rightcolor.r/255,(float)rightcolor.g/255,(float)rightcolor.b/255,1}, {0,0}}
 };
+
+
+/* Outer border */
 SDL_Vertex visualborders[] = {
     {{0,36}, {(float)29/255,(float)29/255,(float)29/255,1}, {0,0}},
     {{0,(float)windowsize.y}, {(float)29/255,(float)29/255,(float)29/255,1}, {0,0}},
@@ -127,9 +137,20 @@ SDL_Vertex visualborders[] = {
     {{(float)windowsize.x,(float)windowsize.y}, {(float)29/255,(float)29/255,(float)29/255,1}, {0,0}}
 };
 int visualborderindicies[] = { 0, 1, 2, 2, 1, 5, 2, 3, 7, 7, 6, 2, 4, 5, 9, 9, 8, 4, 6, 9, 10, 10, 9, 11 };
-// SDL_Vertex canvasborders[] = {
-//     {{0,36}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
-// };
+
+
+/* Canvas border */
+SDL_Vertex canvasborders[] = {
+    {{precanvas.x,precanvas.y}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+    {{canvas.x,canvas.y}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+    {{canvas.x,canvas.y+canvas.h}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+    {{precanvas.x,precanvas.y+precanvas.h}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+    {{precanvas.x+precanvas.w,precanvas.y}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+    {{canvas.x+precanvas.w,canvas.y}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+    {{canvas.x+precanvas.w,canvas.y+canvas.h}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+    {{precanvas.x+precanvas.w,precanvas.y+precanvas.h}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}}
+};
+int canvasborderindicies[] = { 0, 1, 3, 3, 2, 1, 2, 3, 7, 7, 6, 2, 6, 7, 4, 4, 5, 6, 5, 4, 1, 1, 0, 4 };
 
 
 /* Limit function */
@@ -145,9 +166,38 @@ double max(double a, double b) { return (a>b)?a:b; }
 double min(double a, double b) { return (a<b)?a:b; }
 
 
+/* Secondary line function */
+void bersenline(SDL_Renderer * renderer, SDL_Color cola, SDL_Color colb, vec2 start, vec2 end, bool primary) {
+    vec2 distance = { abs(end.x-start.x), abs(end.y-start.y) };
+    vec2 mirror = { (start.x<end.x)?1:-1, (start.y<end.y) ?1:-1 };
+    int err = distance.x-distance.y;
+
+    while (true) {
+        if (primary){
+            ((start.x+start.y)%2==0)?SDL_SetRenderDrawColor(renderer, cola.r, cola.g, cola.b, cola.a):SDL_SetRenderDrawColor(renderer, colb.r, colb.g, colb.b, colb.a);
+        }
+        else{
+            ((start.x+start.y)%2==1)?SDL_SetRenderDrawColor(renderer, cola.r, cola.g, cola.b, cola.a):SDL_SetRenderDrawColor(renderer, colb.r, colb.g, colb.b, colb.a);
+        }
+        SDL_RenderPoint(renderer, start.x, start.y);
+
+        if (start.x==end.x && start.y==end.y) break;
+
+        if (2*err>-distance.y) {
+            err -= distance.y;
+            start.x += mirror.x;
+        }
+        if (2*err<distance.x) {
+            err += distance.x;
+            start.y += mirror.y;
+        }
+    }
+}
+
+
 /* Main! */
 int main() {
-
+    undotextures.resize(1);
 
     /* Initialize SDL, create window and renderer */
     std::cout << "Initializing SDL3" << std::endl;
@@ -181,11 +231,11 @@ int main() {
     SDL_Surface * pretools = SDL_LoadBMP(tempath);
     SDL_Texture * tools = SDL_CreateTextureFromSurface(renderer, pretools);
     SDL_GetTextureSize(tools, &toolsrect.w, &toolsrect.h);
-    toolsrect = (SDL_FRect){ .x=toolsrect.x, .y=((float)windowsize.y/2)-(toolsrect.h/(toolsrect.h/toolsuiwidth)), .w=toolsuiwidth, .h=toolsuiwidth*(toolsrect.h/toolsrect.w) };
-    toolshoveredrect = (SDL_FRect){ .x=0,.y=0,toolsrect.w/3,toolsrect.w/3 };
-    toolselectedrect = (SDL_FRect){ .x=0,.y=0,toolsrect.w/3,toolsrect.w/3 };
-    cursizerectborder = (SDL_FRect){ .x=toolsrect.x, .y=toolsrect.y, .w=toolsrect.w, .h=-toolsrect.w };
-    cursizerectinborder = (SDL_FRect){ .x=toolsrect.x+4, .y=toolsrect.y-4, .w=toolsrect.w-8, .h=-toolsrect.w+8 };
+    toolsrect = (SDL_FRect){toolsrect.x,((float)windowsize.y/2)-(toolsrect.h/(toolsrect.h/toolsuiwidth)),toolsuiwidth,toolsuiwidth*(toolsrect.h/toolsrect.w) };
+    toolshoveredrect = (SDL_FRect){0,0,toolsrect.w/3,toolsrect.w/3 };
+    toolselectedrect = (SDL_FRect){0,0,toolsrect.w/3,toolsrect.w/3 };
+    cursizerectborder = (SDL_FRect){toolsrect.x,toolsrect.y,toolsrect.w,-toolsrect.w };
+    cursizerectinborder = (SDL_FRect){toolsrect.x+4,toolsrect.y-4,toolsrect.w-8,-toolsrect.w+8 };
     snprintf(tempath, sizeof(tempath), "%s%s", SDL_GetBasePath(), "../Resources/border.bmp");
     SDL_Surface * pretoolsborder = SDL_LoadBMP(tempath);
     SDL_Texture * toolsborder = SDL_CreateTextureFromSurface(renderer, pretoolsborder);
@@ -200,21 +250,23 @@ int main() {
     SDL_SetRenderTarget(renderer, sprite[frame]);
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
     SDL_RenderClear(renderer);
+    SDL_SetRenderTarget(renderer, presprite);
+    SDL_RenderClear(renderer);
     SDL_SetRenderTarget(renderer, NULL);
     SDL_SetTextureScaleMode(presprite, SDL_SCALEMODE_NEAREST);
     SDL_SetTextureScaleMode(sprite[0], SDL_SCALEMODE_NEAREST);
     SDL_SetTextureScaleMode(cursorture, SDL_SCALEMODE_NEAREST);
     SDL_GetTextureSize(presprite, &spriterect.w, &spriterect.h);
-    spriterect = (SDL_FRect){ .x=0, .y=0, .w=spriterect.w, .h=spriterect.h };
+    spriterect = (SDL_FRect){0,0,spriterect.w,spriterect.h };
     SDL_Surface * tempcursizetextrect = TTF_RenderText_Blended(font, "1x", (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
     SDL_Texture * cursizetextrecture = SDL_CreateTextureFromSurface(renderer, tempcursizetextrect);
     SDL_DestroySurface(tempcursizetextrect);
     SDL_GetTextureSize(cursizetextrecture, &cursizetextrect.w, &cursizetextrect.h);
-    cursizetextrect = (SDL_FRect){ .x=cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2), .y=cursizerectborder.y+cursizerectborder.h-cursizetextrect.h, .w=cursizetextrect.w, .h=cursizetextrect.h };
+    cursizetextrect = (SDL_FRect){cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2),cursizerectborder.y+cursizerectborder.h-cursizetextrect.h,cursizetextrect.w,cursizetextrect.h };
 
 
     /* Setup variables that require data from textures */
-    selectedcolorealrect = (SDL_FRect){ .x=8+((selectedcolorect.w-selectedcolorealrect.w)/2), .y=toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2), .w=selectedcolorealrect.w, .h=selectedcolorealrect.h };
+    selectedcolorealrect = (SDL_FRect){8+((selectedcolorect.w-selectedcolorealrect.w)/2),toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2),selectedcolorealrect.w,selectedcolorealrect.h };
     leftcoloralphapreview[0].position.x=selectedcolorealrect.x;
     leftcoloralphapreview[0].position.y=selectedcolorealrect.y;
     leftcoloralphapreview[1].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
@@ -227,7 +279,7 @@ int main() {
     leftcolorpreview[1].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
     leftcolorpreview[2].position.x=selectedcolorealrect.x;
     leftcolorpreview[2].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
-    selectedcolorealrect = (SDL_FRect){ .x=toolsrect.w-selectedcolorect.w+8+((selectedcolorect.w-selectedcolorealrect.w)/2), .y=toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2), .w=selectedcolorealrect.w, .h=selectedcolorealrect.h };
+    selectedcolorealrect = (SDL_FRect){toolsrect.w-selectedcolorect.w+8+((selectedcolorect.w-selectedcolorealrect.w)/2),toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2),selectedcolorealrect.w,selectedcolorealrect.h };
     rightcoloralphapreview[0].position.x=selectedcolorealrect.x;
     rightcoloralphapreview[0].position.y=selectedcolorealrect.y;
     rightcoloralphapreview[1].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
@@ -295,21 +347,13 @@ int main() {
 
 
                     /* Reset canvas */
-                    precanvas = (SDL_FRect){ .x=margin.a, .y=44, .w=windowsize.x-margin.a-margin.b, .h=(float)windowsize.y-52 };
-                    canvascenter = (fvec2){ .x=(margin.a/2)+((windowsize.x-margin.b)/2), .y=22+(((float)windowsize.y-8)/2) };
-                    canvasize = (fvec2){ .x=resratio.x*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w), .y=resratio.y*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w) };
-                    canvas = (SDL_FRect){ .x=canvas.x, .y=canvas.y, .w=canvas.w*(canvasize.x/oldcanvasize.x), .h=canvas.h*(canvasize.y/oldcanvasize.y) };
+                    precanvas = (SDL_FRect){margin.a,44,windowsize.x-margin.a-margin.b,(float)windowsize.y-52 };
+                    canvascenter = (fvec2){(margin.a/2)+((windowsize.x-margin.b)/2),22+(((float)windowsize.y-8)/2) };
+                    canvasize = (fvec2){resratio.x*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w),resratio.y*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w) };
+                    canvas = (SDL_FRect){canvas.x,canvas.y,canvas.w*(canvasize.x/oldcanvasize.x),canvas.h*(canvasize.y/oldcanvasize.y) };
                     if (canvas.w<=precanvas.w) canvas.x=(precanvas.x+((precanvas.w-canvas.w)/2));
                     if (canvas.h<=precanvas.h) canvas.y=(precanvas.y+((precanvas.h-canvas.h)/2));
-
                     oldcanvasize=canvasize;
-
-
-                    /* Reset canvas borders */
-                    upbar = (SDL_FRect){ .x=margin.a, .y=44, .w=precanvas.w, .h=canvas.y-precanvas.y };
-                    downbar = (SDL_FRect){ .x=margin.a, .y=(float)windowsize.y-8, .w=precanvas.w, .h=((canvas.y+canvas.h)-(precanvas.y+precanvas.h)) };
-                    leftbar = (SDL_FRect){ .x=margin.a, .y=44, .w=-((canvas.x+canvas.w)-(precanvas.x+precanvas.w)), .h=precanvas.h };
-                    rightbar = (SDL_FRect){ .x=margin.a+precanvas.w, .y=44, .w=((canvas.x+canvas.w)-(precanvas.x+precanvas.w)), .h=precanvas.h };
 
 
                     /* Reset UI */
@@ -319,11 +363,11 @@ int main() {
 
 
                     /* Reset pen size text */
-                    cursizetextrect = (SDL_FRect){ .x=cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2), .y=cursizerectborder.y+cursizerectborder.h-cursizetextrect.h, .w=cursizetextrect.w, .h=cursizetextrect.h };
+                    cursizetextrect = (SDL_FRect){cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2),cursizerectborder.y+cursizerectborder.h-cursizetextrect.h,cursizetextrect.w,cursizetextrect.h };
 
 
                     /* Reset color preview position */
-                    selectedcolorealrect = (SDL_FRect){ .x=8+((selectedcolorect.w-selectedcolorealrect.w)/2), .y=toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2), .w=selectedcolorealrect.w, .h=selectedcolorealrect.h };
+                    selectedcolorealrect = (SDL_FRect){8+((selectedcolorect.w-selectedcolorealrect.w)/2),toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2),selectedcolorealrect.w,selectedcolorealrect.h };
                     leftcoloralphapreview[0].position.x=selectedcolorealrect.x;
                     leftcoloralphapreview[0].position.y=selectedcolorealrect.y;
                     leftcoloralphapreview[1].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
@@ -336,7 +380,7 @@ int main() {
                     leftcolorpreview[1].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
                     leftcolorpreview[2].position.x=selectedcolorealrect.x;
                     leftcolorpreview[2].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
-                    selectedcolorealrect = (SDL_FRect){ .x=toolsrect.w-selectedcolorect.w+8+((selectedcolorect.w-selectedcolorealrect.w)/2), .y=toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2), .w=selectedcolorealrect.w, .h=selectedcolorealrect.h };
+                    selectedcolorealrect = (SDL_FRect){toolsrect.w-selectedcolorect.w+8+((selectedcolorect.w-selectedcolorealrect.w)/2),toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2),selectedcolorealrect.w,selectedcolorealrect.h };
                     rightcoloralphapreview[0].position.x=selectedcolorealrect.x;
                     rightcoloralphapreview[0].position.y=selectedcolorealrect.y;
                     rightcoloralphapreview[1].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
@@ -357,13 +401,29 @@ int main() {
                     visualborders[5].position.y = (float)windowsize.y;
                     visualborders[6].position.x = windowsize.x-margin.b;
                     visualborders[7].position.x = windowsize.x-margin.b;
-                    visualborders[8].position.x = windowsize.x-margin.b;
-                    visualborders[8].position.y = (float)windowsize.y-8;
-                    visualborders[9].position.x = windowsize.x-margin.b;
-                    visualborders[9].position.y = (float)windowsize.y;
+                    visualborders[8].position = (SDL_FPoint){ windowsize.x-margin.b, (float)windowsize.y-8 };
+                    visualborders[9].position = (SDL_FPoint){ windowsize.x-margin.b, (float)windowsize.y };
                     visualborders[10].position.x = (float)windowsize.x;
-                    visualborders[11].position.x = (float)windowsize.x;
-                    visualborders[11].position.y = (float)windowsize.y;
+                    visualborders[11].position = (SDL_FPoint){ (float)windowsize.x, (float)windowsize.y };
+
+
+                    /* Reset canvas borders */
+                    canvasborders[0].position = (SDL_FPoint){ precanvas.x, precanvas.y };
+                    canvasborders[1].position = (SDL_FPoint){ canvas.x, canvas.y };
+                    canvasborders[2].position = (SDL_FPoint){ canvas.x, canvas.y+canvas.h };
+                    canvasborders[3].position = (SDL_FPoint){ precanvas.x, precanvas.y+precanvas.h };
+                    canvasborders[4].position = (SDL_FPoint){ precanvas.x+precanvas.w, precanvas.y };
+                    canvasborders[5].position = (SDL_FPoint){ canvas.x+canvas.w, canvas.y };
+                    canvasborders[6].position = (SDL_FPoint){ canvas.x+canvas.w, canvas.y+canvas.h };
+                    canvasborders[7].position = (SDL_FPoint){ precanvas.x+precanvas.w, precanvas.y+precanvas.h };
+                    // {{precanvas.x,precanvas.y}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+                    // {{canvas.x,canvas.y}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+                    // {{canvas.x,canvas.y+canvas.h}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+                    // {{precanvas.x,precanvas.y+precanvas.h}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+                    // {{precanvas.x+precanvas.w,precanvas.y}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+                    // {{canvas.x+precanvas.w,canvas.y}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+                    // {{canvas.x+precanvas.w,canvas.y+canvas.h}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}},
+                    // {{precanvas.x+precanvas.w,precanvas.y+precanvas.h}, {(float)160/255,(float)160/255,(float)160/255,1}, {0,0}}
 
 
                 /* Zoom canvas */
@@ -377,8 +437,8 @@ int main() {
 
                     /* Reset canvas */
                     if (keystates[SDL_SCANCODE_LCTRL]){
-                        precanvas = (SDL_FRect){ .x=margin.a, .y=44, .w=windowsize.x-margin.a-margin.b, .h=(float)windowsize.y-52 };
-                        canvas = (SDL_FRect){ .x=(canvas.w<precanvas.w)?canvascenter.x-((canvas.w*(1+(scroll.y/100)))/2):((canvas.x-mouse.x)*(1+(scroll.y/100)))+mouse.x, .y=(canvas.h<precanvas.h)?canvascenter.y-((canvas.h*(1+(scroll.y/100)))/2):((canvas.y-mouse.y)*(1+(scroll.y/100)))+mouse.y, .w=canvas.w*(1+(scroll.y/100)), .h=canvas.h*(1+(scroll.y/100)) };
+                        precanvas = (SDL_FRect){margin.a,44,windowsize.x-margin.a-margin.b,(float)windowsize.y-52 };
+                        canvas = (SDL_FRect){(canvas.w<precanvas.w)?canvascenter.x-((canvas.w*(1+(scroll.y/100)))/2):((canvas.x-mouse.x)*(1+(scroll.y/100)))+mouse.x,(canvas.h<precanvas.h)?canvascenter.y-((canvas.h*(1+(scroll.y/100)))/2):((canvas.y-mouse.y)*(1+(scroll.y/100)))+mouse.y,canvas.w*(1+(scroll.y/100)),canvas.h*(1+(scroll.y/100)) };
                         if (canvas.w>precanvas.w) {
                             (canvas.x>precanvas.x)?canvas.x=precanvas.x:canvas.x;
                             (canvas.x+canvas.w<precanvas.x+precanvas.w)?canvas.x=precanvas.x-(canvas.w-precanvas.w):canvas.x;
@@ -387,13 +447,6 @@ int main() {
                             (canvas.y>precanvas.y)?canvas.y=precanvas.y:canvas.y;
                             (canvas.y+canvas.h<precanvas.y+precanvas.h)?canvas.y=precanvas.y-(canvas.h-precanvas.h):canvas.y;
                         }
-
-
-                        /* Reset canvas borders */
-                        upbar = (SDL_FRect){ .x=margin.a, .y=44, .w=precanvas.w, .h=canvas.y-precanvas.y };
-                        downbar = (SDL_FRect){ .x=margin.a, .y=(float)windowsize.y-8, .w=precanvas.w, .h=((canvas.y+canvas.h)-(precanvas.y+precanvas.h)) };
-                        leftbar = (SDL_FRect){ .x=margin.a, .y=44, .w=-((canvas.x+canvas.w)-(precanvas.x+precanvas.w)), .h=precanvas.h };
-                        rightbar = (SDL_FRect){ .x=margin.a+precanvas.w, .y=44, .w=((canvas.x+canvas.w)-(precanvas.x+precanvas.w)), .h=precanvas.h };
                     }
 
 
@@ -414,8 +467,19 @@ int main() {
 
 
                         /* Reset pen size text */
-                        cursizetextrect = (SDL_FRect){ .x=cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2), .y=cursizerectborder.y+cursizerectborder.h-cursizetextrect.h, .w=cursizetextrect.w, .h=cursizetextrect.h };
+                        cursizetextrect = (SDL_FRect){cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2),cursizerectborder.y+cursizerectborder.h-cursizetextrect.h,cursizetextrect.w,cursizetextrect.h };
                     }
+
+
+                    /* Reset canvas borders */
+                    canvasborders[0].position = (SDL_FPoint){ precanvas.x, precanvas.y };
+                    canvasborders[1].position = (SDL_FPoint){ canvas.x, canvas.y };
+                    canvasborders[2].position = (SDL_FPoint){ canvas.x, canvas.y+canvas.h };
+                    canvasborders[3].position = (SDL_FPoint){ precanvas.x, precanvas.y+precanvas.h };
+                    canvasborders[4].position = (SDL_FPoint){ precanvas.x+precanvas.w, precanvas.y };
+                    canvasborders[5].position = (SDL_FPoint){ canvas.x+canvas.w, canvas.y };
+                    canvasborders[6].position = (SDL_FPoint){ canvas.x+canvas.w, canvas.y+canvas.h };
+                    canvasborders[7].position = (SDL_FPoint){ precanvas.x+precanvas.w, precanvas.y+precanvas.h };
 
 
                 /* Reduce FPS if unfocussed */
@@ -436,13 +500,14 @@ int main() {
 
                 /* Update canvas */
                 case SDL_EVENT_MOUSE_BUTTON_UP:
-                    if ((mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && currentool == 1 && contained(lastmouse, canvas)){
+
+                    if (currentool == 1 && contained(lastmouse, canvas)){
                         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
                         SDL_SetRenderTarget(renderer, sprite[frame]);
                         if (mousebitmask & SDL_BUTTON_LMASK) SDL_SetRenderDrawColor(renderer, leftcolor.r, leftcolor.g, leftcolor.b, leftcolor.a);
                         else if (mousebitmask & SDL_BUTTON_RMASK) SDL_SetRenderDrawColor(renderer, rightcolor.r, rightcolor.g, rightcolor.b, rightcolor.a);
-                        fvec2 roundlastmouse = (fvec2){ .x=(float)(int)(((lastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)), .y=(float)(int)(((lastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)) };
-                        fvec2 roundmouse = (fvec2){ .x=(float)(int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)), .y=(float)(int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)) };
+                        fvec2 roundlastmouse = (fvec2){(float)(int)(((lastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)),(float)(int)(((lastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)) };
+                        fvec2 roundmouse = (fvec2){(float)(int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)),(float)(int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)) };
                         fvec2 fakeroundmouse = roundmouse;
                         if (keystates[SDL_SCANCODE_LSHIFT]) fakeroundmouse = (fvec2){ (float)(sin(round(atan2(roundmouse.x-roundlastmouse.x, roundmouse.y-roundlastmouse.y)/M_EIGHTHPI)*M_EIGHTHPI)*sqrt(((roundmouse.x-roundlastmouse.x)*(roundmouse.x-roundlastmouse.x))+((roundmouse.y-roundlastmouse.y)*(roundmouse.y-roundlastmouse.y))))+roundlastmouse.x, (float)(cos(round(atan2(roundmouse.x-roundlastmouse.x, roundmouse.y-roundlastmouse.y)/M_EIGHTHPI)*M_EIGHTHPI)*sqrt(((roundmouse.x-roundlastmouse.x)*(roundmouse.x-roundlastmouse.x))+((roundmouse.y-roundlastmouse.y)*(roundmouse.y-roundlastmouse.y))))+roundlastmouse.y };
                         for (int y = 0; y < (int)cursize; y++) {
@@ -450,8 +515,26 @@ int main() {
                                 SDL_RenderLine(renderer, roundlastmouse.x+x, roundlastmouse.y+y, fakeroundmouse.x+x, fakeroundmouse.y+y );
                             }
                         }
+                        SDL_SetRenderTarget(renderer, presprite);
+                        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+                        SDL_RenderClear(renderer);
                         SDL_SetRenderTarget(renderer, NULL);
                         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+                    }
+                    undupdatequeueda = true;
+
+
+                case SDL_EVENT_KEY_DOWN:
+
+
+                    /* Undo */
+                    if (keystates[SDL_SCANCODE_LGUI]) {
+                        if (e.key.key == SDLK_Z) {
+                            if (undotextures[frame].size() > 1) {
+                                sprite[frame] = undotextures[frame][0];
+                                resizeundo = true;
+                            }
+                        }
                     }
             }
         }
@@ -481,8 +564,8 @@ int main() {
                     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
                     SDL_RenderClear(renderer);
                     SDL_SetRenderDrawColor(renderer, 160, 215, 240, 153);
-                    fvec2 roundlastmouse = (fvec2){ .x=(float)(int)(((lastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)), .y=(float)(int)(((lastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)) };
-                    fvec2 roundmouse = (fvec2){ .x=(float)(int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)), .y=(float)(int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)) };
+                    fvec2 roundlastmouse = (fvec2){(float)(int)(((lastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)),(float)(int)(((lastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)) };
+                    fvec2 roundmouse = (fvec2){(float)(int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)),(float)(int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)) };
                     fvec2 fakeroundmouse = roundmouse;
                     if (keystates[SDL_SCANCODE_LSHIFT]) fakeroundmouse = (fvec2){ (float)(sin(round(atan2(roundmouse.x-roundlastmouse.x, roundmouse.y-roundlastmouse.y)/M_EIGHTHPI)*M_EIGHTHPI)*sqrt(((roundmouse.x-roundlastmouse.x)*(roundmouse.x-roundlastmouse.x))+((roundmouse.y-roundlastmouse.y)*(roundmouse.y-roundlastmouse.y))))+roundlastmouse.x, (float)(cos(round(atan2(roundmouse.x-roundlastmouse.x, roundmouse.y-roundlastmouse.y)/M_EIGHTHPI)*M_EIGHTHPI)*sqrt(((roundmouse.x-roundlastmouse.x)*(roundmouse.x-roundlastmouse.x))+((roundmouse.y-roundlastmouse.y)*(roundmouse.y-roundlastmouse.y))))+roundlastmouse.y };
                     for (int y = 0; y < (int)cursize; y++) {
@@ -507,8 +590,8 @@ int main() {
                 }
 
 
-                /* Draw line from framelastmouse to mouse, mirrored if you have to */
-                if (currentool == 3) {
+                /* Draw line from framelastmouse to mouse mirrored */
+                else if (currentool == 3) {
                     SDL_SetRenderTarget(renderer, sprite[frame]);
                     (mousebitmask & SDL_BUTTON_LMASK)?SDL_SetRenderDrawColor(renderer, leftcolor.r, leftcolor.g, leftcolor.b, leftcolor.a):SDL_SetRenderDrawColor(renderer, rightcolor.r, rightcolor.g, rightcolor.b, rightcolor.a);
                     for (int y = 0; y < (int)cursize; y++) {
@@ -551,8 +634,33 @@ int main() {
                 }
 
 
+                /* Draw dithered line from framelastmouse to mouse */
+                else if (currentool == 4) {
+                    SDL_SetRenderTarget(renderer, sprite[frame]);
+                    for (int y = 0; y < (int)cursize; y++) {
+                        for (int x = 0; x < (int)cursize; x++) {
+                            bersenline(renderer, leftcolor, rightcolor, (vec2){(int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y}, (vec2){(int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y}, (mousebitmask & SDL_BUTTON_LMASK));
+                        }
+                    }
+                    SDL_SetRenderTarget(renderer, NULL);
+                }
+
+
+                /* Increase or decrease a pixel's brightness */
+                else if (currentool == 5) {
+
+                }
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         }
+
+
+        /* Update undo list */
+        if (undupdatequeuedb) {
+            undupdatequeueda = false;
+            undupdatequeuedb = false;
+            undotextures[frame].push_back(sprite[frame]);
+        }
+        if (undupdatequeueda) undupdatequeuedb = true;
 
 
         /* Render canvas */
@@ -564,26 +672,25 @@ int main() {
             SDL_RenderClear(renderer);
             SDL_SetRenderTarget(renderer, NULL);
         }
+        if ((mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && currentool == 4 && contained(lastmouse, canvas)) {
+            SDL_RenderTexture(renderer, presprite, NULL, &canvas);
+        }
         if (contained(mouse, canvas) && !(mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && focus){
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
             SDL_SetRenderTarget(renderer, cursorture);
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
             SDL_RenderClear(renderer);
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, 51);
-            cursorturect = (SDL_FRect){ .x=(float)(int)((((mouse.x-canvas.x)/canvas.w)*resolution.x)-((float)(int)(cursize-1)/2)), .y=(float)(int)((((mouse.y-canvas.y)/canvas.h)*resolution.y)-((float)(int)(cursize-1)/2)), .w=(float)(int)cursize, .h=(float)(int)cursize };
+            cursorturect = (SDL_FRect){(float)(int)((((mouse.x-canvas.x)/canvas.w)*resolution.x)-((float)(int)(cursize-1)/2)),(float)(int)((((mouse.y-canvas.y)/canvas.h)*resolution.y)-((float)(int)(cursize-1)/2)),(float)(int)cursize,(float)(int)cursize };
             SDL_RenderFillRect(renderer, &cursorturect);
             SDL_SetRenderTarget(renderer, NULL);
             SDL_RenderTexture(renderer, cursorture, NULL, &canvas);
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         }
-        SDL_SetRenderDrawColor(renderer, 160, 160, 160, 255);
-        SDL_RenderFillRect(renderer, &upbar);
-        SDL_RenderFillRect(renderer, &downbar);
-        SDL_RenderFillRect(renderer, &leftbar);
-        SDL_RenderFillRect(renderer, &rightbar);
 
 
         /* Render margins */
+        SDL_RenderGeometry(renderer, NULL, canvasborders, 8, canvasborderindicies, 24);
         SDL_RenderGeometry(renderer, NULL, visualborders, 12, visualborderindicies, 24);
 
 
@@ -595,7 +702,7 @@ int main() {
         /* Render UI */
         SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
         if (contained(mouse, toolsrect) && toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)] != "") {
-            toolselectedrect = (SDL_FRect){ .x=(float)((int)((mouse.x-toolsrect.x)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.x, .y=(float)((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.y, .w=toolselectedrect.w, .h=toolselectedrect.h };
+            toolselectedrect = (SDL_FRect){(float)((int)((mouse.x-toolsrect.x)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.x,(float)((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.y,toolselectedrect.w,toolselectedrect.h };
             SDL_RenderFillRect(renderer, &toolselectedrect);
         }
         toolshoveredrect.x=(currentool%3)*(toolsrect.w/3)+toolsrect.x;
@@ -607,21 +714,21 @@ int main() {
         SDL_SetRenderDrawColor(renderer, 15, 15, 15, 255);
         SDL_RenderFillRect(renderer, &cursizerectinborder);
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        cursizerect = (SDL_FRect){ .x=(float)limit(-((canvas.w/resolution.x)*(int)cursize)/2+cursizerectborder.x+(cursizerectborder.w/2),cursizerectinborder.x), .y=(float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize),NULL,cursizerectinborder.y), .w=(float)limit(canvas.w/resolution.x*(int)cursize,NULL,cursizerectinborder.w), .h=-(float)limit(canvas.h/resolution.y*(int)cursize,NULL,-cursizerectinborder.h) };
+        cursizerect = (SDL_FRect){(float)limit(-((canvas.w/resolution.x)*(int)cursize)/2+cursizerectborder.x+(cursizerectborder.w/2),cursizerectinborder.x),(float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize),NULL,cursizerectinborder.y),(float)limit(canvas.w/resolution.x*(int)cursize,NULL,cursizerectinborder.w),-(float)limit(canvas.h/resolution.y*(int)cursize,NULL,-cursizerectinborder.h) };
         SDL_RenderFillRect(renderer, &cursizerect);
-        selectedcolorect = (SDL_FRect){ .x=8, .y=toolsrect.y+toolsrect.h+8, .w=selectedcolorect.w, .h=selectedcolorect.h };
+        selectedcolorect = (SDL_FRect){8,toolsrect.y+toolsrect.h+8,selectedcolorect.w,selectedcolorect.h };
         (contained(mouse,selectedcolorect))?SDL_SetRenderDrawColor(renderer, 136, 136, 136, 255):SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
         SDL_RenderFillRect(renderer, &selectedcolorect);
-        selectedcolorect = (SDL_FRect){ .x=toolsrect.w-selectedcolorect.w+8, .y=toolsrect.y+toolsrect.h+8, .w=selectedcolorect.w, .h=selectedcolorect.h };
+        selectedcolorect = (SDL_FRect){toolsrect.w-selectedcolorect.w+8,toolsrect.y+toolsrect.h+8,selectedcolorect.w,selectedcolorect.h };
         (contained(mouse,selectedcolorect))?SDL_SetRenderDrawColor(renderer, 136, 136, 136, 255):SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
         SDL_RenderFillRect(renderer, &selectedcolorect);
         SDL_SetRenderDrawColor(renderer, leftcolor.r, leftcolor.g, leftcolor.b, leftcolor.a);
-        selectedcolorealrect = (SDL_FRect){ .x=8+((selectedcolorect.w-selectedcolorealrect.w)/2), .y=toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2), .w=selectedcolorealrect.w, .h=selectedcolorealrect.h };
+        selectedcolorealrect = (SDL_FRect){8+((selectedcolorect.w-selectedcolorealrect.w)/2),toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2),selectedcolorealrect.w,selectedcolorealrect.h };
         SDL_RenderTexture(renderer, colorselector, NULL, &selectedcolorealrect);
         SDL_RenderGeometry(renderer, NULL, leftcoloralphapreview, 3, NULL, 0);
         SDL_RenderGeometry(renderer, NULL, leftcolorpreview, 3, NULL, 0);
         SDL_SetRenderDrawColor(renderer, rightcolor.r, rightcolor.g, rightcolor.b, rightcolor.a);
-        selectedcolorealrect = (SDL_FRect){ .x=toolsrect.w-selectedcolorect.w+8+((selectedcolorect.w-selectedcolorealrect.w)/2), .y=toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2), .w=selectedcolorealrect.w, .h=selectedcolorealrect.h };
+        selectedcolorealrect = (SDL_FRect){toolsrect.w-selectedcolorect.w+8+((selectedcolorect.w-selectedcolorealrect.w)/2),toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2),selectedcolorealrect.w,selectedcolorealrect.h };
         SDL_RenderTexture(renderer, colorselector, NULL, &selectedcolorealrect);
         SDL_RenderGeometry(renderer, NULL, rightcoloralphapreview, 3, NULL, 0);
         SDL_RenderGeometry(renderer, NULL, rightcolorpreview, 3, NULL, 0);
@@ -645,7 +752,7 @@ int main() {
 
         /* Wait if unfocussed */
         if (!focus) SDL_Delay((Uint32)250);
-        SDL_Delay((Uint32)2);
+        SDL_Delay((Uint32)5);
     }
 
 
