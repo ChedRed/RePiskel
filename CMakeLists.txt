@@ -1,5 +1,6 @@
 # Basic project requirements
 cmake_minimum_required(VERSION 3.10)
+set(CMAKE_OSX_SYSROOT macosx)
 project(RePiskel)
 
 
@@ -43,3 +44,4 @@ file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/colorselector.bmp DESTINATION ${CMAKE_S
 file(COPY ${CMAKE_SOURCE_DIR}/../Cached/libSDL3.0.dylib DESTINATION ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/contents/Resources)
 configure_file(${CMAKE_SOURCE_DIR}/../Cached/libSDL3_ttf.0.0.0.dylib ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/contents/Resources/libSDL3_ttf.0.dylib COPYONLY)
 # configure_file(${CMAKE_SOURCE_DIR}/../Cached/libgtk-4.1.dylib ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/contents/Resources/libgtk-4.1.dylib COPYONLY)
+
