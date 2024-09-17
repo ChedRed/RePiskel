@@ -1,7 +1,3 @@
-#include "SDL3/SDL_events.h"
-#include "SDL3/SDL_keycode.h"
-#include "SDL3/SDL_mouse.h"
-#include "SDL3/SDL_scancode.h"
 #include <cmath>
 #include <vector>
 #include <optional>
@@ -500,8 +496,7 @@ int main() {
 
                 /* Update canvas */
                 case SDL_EVENT_MOUSE_BUTTON_UP:
-
-                    if (currentool == 1 && contained(lastmouse, canvas)){
+                    if ((mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && currentool == 1 && contained(lastmouse, canvas)){
                         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
                         SDL_SetRenderTarget(renderer, sprite[frame]);
                         if (mousebitmask & SDL_BUTTON_LMASK) SDL_SetRenderDrawColor(renderer, leftcolor.r, leftcolor.g, leftcolor.b, leftcolor.a);
