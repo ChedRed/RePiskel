@@ -1,7 +1,4 @@
-#include "SDL3/SDL_blendmode.h"
-#include "SDL3/SDL_error.h"
-#include "SDL3/SDL_render.h"
-#include "SDL3/SDL_scancode.h"
+#include <algorithm>
 #include <cmath>
 #include <vector>
 #include <optional>
@@ -716,6 +713,11 @@ int main() {
                 else if (currentool == 5) {
                     if (keystates[SDL_SCANCODE_LSHIFT]) {
                         SDL_SetRenderTarget(renderer, presprite);
+                        if (!oldshift) {
+                            SDL_SetTextureBlendMode(sprite[frame], SDL_BLENDMODE_ADD);
+                            SDL_RenderTexture(renderer, sprite[frame], NULL, &spriterect);
+                            SDL_SetTextureBlendMode(sprite[frame], SDL_BLENDMODE_BLEND);
+                        }
                         for (int y = 0; y < (int)cursize; y++) {
                             for (int x = 0; x < (int)cursize; x++) {
                                 lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, keystates[SDL_SCANCODE_LCTRL]);

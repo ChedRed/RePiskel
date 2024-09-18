@@ -1,17 +1,17 @@
 # Basic project requirements
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.30)
 set(CMAKE_OSX_SYSROOT macosx)
 project(RePiskel)
 
 
 # Set CMake variables
-set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 
 # Main executable
 add_executable(repiskel main.cpp)
+target_compile_features(repiskel PRIVATE cxx_std_23)
 
 
 # Set macos executable rpath and result path
