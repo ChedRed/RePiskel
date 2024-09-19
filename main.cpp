@@ -1,9 +1,11 @@
-#include <algorithm>
-#include <cmath>
-#include <vector>
-#include <optional>
-#include <string>
+#include "SDL3/SDL_blendmode.h"
+#include "SDL3/SDL_error.h"
 #include <iostream>
+#include <cmath>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <optional>
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
@@ -41,6 +43,7 @@ fvec2 framelastmouse = { 0, 0 };
 Uint32 mousebitmask;
 const Uint8 * keystates = SDL_GetKeyboardState(NULL);
 bool oldshift = false;
+bool oldmousedown = false;
 
 
 /* UI */
@@ -66,6 +69,7 @@ SDL_Texture * cursorture;
 SDL_FRect cursorturect = { 0, 0, 1, 1 };
 SDL_FRect spriterect;
 int frame = 0;
+bool skiprespriterender = false;
 
 
 /* Canvas drawing variables */
@@ -73,6 +77,10 @@ void*pixels;
 int pitch;
 SDL_Color leftcolor = (SDL_Color){ .r=0, .g=0, .b=0, .a=255 };
 SDL_Color rightcolor = (SDL_Color){ .r=0, .g=0, .b=0, .a=0 };
+
+
+/* Custom SDL3 items */
+SDL_BlendMode straightdarken = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_REV_SUBTRACT, SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_REV_SUBTRACT);
 
 
 /* Undo variables */
@@ -197,16 +205,18 @@ void ditherline(SDL_Renderer * renderer, SDL_Color cola, SDL_Color colb, vec2 st
 
 
 /* Tertiary line function for lighten */
-void lightenline(SDL_Renderer * renderer, vec2 start, vec2 end, bool darken) {
-    (darken)?SDL_SetRenderDrawColor(renderer, 0, 0, 0, 8):SDL_SetRenderDrawColor(renderer, 255, 255, 255, 8);
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD);
+void lightenline(SDL_Renderer * renderer, vec2 start, vec2 end, SDL_Rect bound, bool darken, bool add) {
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 16);
+    if (add) (darken)?SDL_SetRenderDrawBlendMode(renderer, straightdarken):SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD);
+    else SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     vec2 distance = { abs(end.x-start.x), abs(end.y-start.y) };
     vec2 mirror = { (start.x<end.x)?1:-1, (start.y<end.y) ?1:-1 };
     int err = distance.x-distance.y;
 
     while (true) {
 
-        SDL_RenderPoint(renderer, start.x, start.y);
+        if (contained((fvec2){ (float)start.x,(float)start.y }, (SDL_FRect){ bound.x, bound.y, bound.w, bound.h })) { SDL_RenderPoint(renderer, start.x, start.y) };
+        std::cout << SDL_GetError() << std::endl;
 
         if (start.x==end.x && start.y==end.y) break;
 
@@ -545,12 +555,11 @@ int main() {
                     if ((mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && currentool == 5 && contained(lastmouse, canvas)) {
                         if (keystates[SDL_SCANCODE_LSHIFT] || oldshift) {
                             SDL_SetRenderTarget(renderer, sprite[frame]);
-                            SDL_SetTextureBlendMode(presprite, SDL_BLENDMODE_ADD);
+                            SDL_SetTextureBlendMode(presprite, (keystates[SDL_SCANCODE_LCTRL])?SDL_SetRenderDrawBlendMode(renderer, straightdarken):SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD));
                             SDL_RenderTexture(renderer, presprite, NULL, &spriterect);
-                            SDL_SetRenderTarget(renderer, presprite);
-                            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-                            SDL_RenderClear(renderer);
+                            SDL_SetTextureBlendMode(presprite, SDL_BLENDMODE_BLEND);
                             SDL_SetRenderTarget(renderer, NULL);
+                            skiprespriterender = true;
                         }
                     }
                     if (contained(lastmouse, canvas)) undupdatequeued = true;
@@ -713,14 +722,13 @@ int main() {
                 else if (currentool == 5) {
                     if (keystates[SDL_SCANCODE_LSHIFT]) {
                         SDL_SetRenderTarget(renderer, presprite);
-                        if (!oldshift) {
-                            SDL_SetTextureBlendMode(sprite[frame], SDL_BLENDMODE_ADD);
-                            SDL_RenderTexture(renderer, sprite[frame], NULL, &spriterect);
-                            SDL_SetTextureBlendMode(sprite[frame], SDL_BLENDMODE_BLEND);
+                        if (!oldmousedown || !oldshift) {
+                            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+                            SDL_RenderClear(renderer);
                         }
                         for (int y = 0; y < (int)cursize; y++) {
                             for (int x = 0; x < (int)cursize; x++) {
-                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, keystates[SDL_SCANCODE_LCTRL]);
+                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, keystates[SDL_SCANCODE_LCTRL], false);
                             }
                         }
                         SDL_SetRenderTarget(renderer, NULL);
@@ -730,9 +738,15 @@ int main() {
                         if (oldshift) {
                             SDL_RenderTexture(renderer, presprite, NULL, &spriterect);
                         }
+                        else {
+                            SDL_SetRenderTarget(renderer, presprite);
+                            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+                            SDL_RenderClear(renderer);
+                            SDL_SetRenderTarget(renderer, sprite[frame]);
+                        }
                         for (int y = 0; y < (int)cursize; y++) {
                             for (int x = 0; x < (int)cursize; x++) {
-                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, keystates[SDL_SCANCODE_LCTRL]);
+                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, keystates[SDL_SCANCODE_LCTRL], true);
                             }
                         }
                         SDL_SetRenderTarget(renderer, NULL);
@@ -771,8 +785,9 @@ int main() {
             SDL_RenderClear(renderer);
             SDL_SetRenderTarget(renderer, NULL);
         }
-        if ((mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && currentool == 4 && contained(lastmouse, canvas)) {
-            SDL_RenderTexture(renderer, presprite, NULL, &canvas);
+        if ((mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && (currentool == 4 || currentool == 5) && contained(lastmouse, canvas)) {
+            if (skiprespriterender) skiprespriterender = false;
+            else SDL_RenderTexture(renderer, presprite, NULL, &canvas);
         }
         if (contained(mouse, canvas) && !(mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && focus){
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
@@ -848,6 +863,7 @@ int main() {
         /* Update input variables */
         framelastmouse = mouse;
         oldshift = keystates[SDL_SCANCODE_LSHIFT];
+        oldmousedown = (mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK);
 
 
         /* Wait if unfocussed */
