@@ -1,5 +1,6 @@
 #include "SDL3/SDL_blendmode.h"
 #include "SDL3/SDL_error.h"
+#include <cstdlib>
 #include <iostream>
 #include <cmath>
 #include <string>
@@ -182,6 +183,7 @@ void ditherline(SDL_Renderer * renderer, SDL_Color cola, SDL_Color colb, vec2 st
     int err = distance.x-distance.y;
 
     while (true) {
+        vec2 oldstart = start;
         if (primary){
             ((start.x+start.y)%2==0)?SDL_SetRenderDrawColor(renderer, cola.r, cola.g, cola.b, cola.a):SDL_SetRenderDrawColor(renderer, colb.r, colb.g, colb.b, colb.a);
         }
@@ -189,8 +191,6 @@ void ditherline(SDL_Renderer * renderer, SDL_Color cola, SDL_Color colb, vec2 st
             ((start.x+start.y)%2==1)?SDL_SetRenderDrawColor(renderer, cola.r, cola.g, cola.b, cola.a):SDL_SetRenderDrawColor(renderer, colb.r, colb.g, colb.b, colb.a);
         }
         SDL_RenderPoint(renderer, start.x, start.y);
-
-        if (start.x==end.x && start.y==end.y) break;
 
         if (2*err>-distance.y) {
             err -= distance.y;
@@ -200,12 +200,14 @@ void ditherline(SDL_Renderer * renderer, SDL_Color cola, SDL_Color colb, vec2 st
             err += distance.x;
             start.y += mirror.y;
         }
+
+        if (oldstart.x==start.x && oldstart.y==start.y) break;
     }
 }
 
 
 /* Tertiary line function for lighten */
-void lightenline(SDL_Renderer * renderer, vec2 start, vec2 end, SDL_Rect bound, bool darken, bool add) {
+void lightenline(SDL_Renderer * renderer, vec2 start, vec2 end, bool darken, bool add) {
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 16);
     if (add) (darken)?SDL_SetRenderDrawBlendMode(renderer, straightdarken):SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD);
     else SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
@@ -214,11 +216,9 @@ void lightenline(SDL_Renderer * renderer, vec2 start, vec2 end, SDL_Rect bound, 
     int err = distance.x-distance.y;
 
     while (true) {
+        SDL_RenderPoint(renderer, start.x, start.y);
 
-        if (contained((fvec2){ (float)start.x,(float)start.y }, (SDL_FRect){ bound.x, bound.y, bound.w, bound.h })) { SDL_RenderPoint(renderer, start.x, start.y) };
-        std::cout << SDL_GetError() << std::endl;
-
-        if (start.x==end.x && start.y==end.y) break;
+        if (std::abs(start.x-end.x)<=1 || std::abs(start.y-end.y)<=1) break;
 
         if (2*err>-distance.y) {
             err -= distance.y;
