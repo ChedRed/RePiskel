@@ -1,5 +1,6 @@
-#include "SDL3/SDL_blendmode.h"
-#include "SDL3/SDL_error.h"
+#include "SDL3/SDL_oldnames.h"
+#include "SDL3/SDL_pixels.h"
+#include "SDL3/SDL_render.h"
 #include <cstdlib>
 #include <iostream>
 #include <cmath>
@@ -31,7 +32,8 @@ struct duo { float a; float b; };
 /* Display setup variables */
 deltadata dtdata;
 vec2 windowsize = { 1000, 650 };
-SDL_Color gridC = { .r=76, .g=76, .b=76, .a=255 };
+SDL_Color gridmain = { .r=85, .g=85, .b=85, .a=255 };
+SDL_Color gridalt = { .r=76, .g=76, .b=76, .a=255 };
 SDL_FRect grid = { 0, 0, 8, 8 };
 
 
@@ -81,8 +83,10 @@ SDL_Color rightcolor = (SDL_Color){ .r=0, .g=0, .b=0, .a=0 };
 
 
 /* Custom SDL3 items */
+SDL_BlendMode straightbrighten = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_REV_SUBTRACT);
 SDL_BlendMode straightdarken = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_REV_SUBTRACT, SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_REV_SUBTRACT);
-
+SDL_BlendMode reverstraightbrighten = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ZERO, SDL_BLENDOPERATION_REV_SUBTRACT);
+SDL_BlendMode reverstraightdarken = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDOPERATION_REV_SUBTRACT, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ZERO, SDL_BLENDOPERATION_REV_SUBTRACT);
 
 /* Undo variables */
 int unlimit = 512;
@@ -105,29 +109,31 @@ SDL_FRect cursizerectborder;
 SDL_FRect cursizerect;
 float cursize = 1;
 SDL_FRect cursizetextrect;
-SDL_FRect selectedcolorect = { 0, 0, 36, 36 };
-SDL_FRect selectedcolorealrect = { 0, 0, selectedcolorect.w-8, selectedcolorect.h-8 };
+SDL_FRect leftselectedcolorect = { 0, 0, 36, 36 };
+SDL_FRect rightselectedcolorect = { 0, 0, 36, 36 };
+SDL_FRect leftselectedcolorealrect = { 0, 0, leftselectedcolorect.w-8, leftselectedcolorect.h-8 };
+SDL_FRect rightselectedcolorealrect = { 0, 0, rightselectedcolorect.w-8, rightselectedcolorect.h-8 };
 SDL_Vertex leftcoloralphapreview[] = {
-    {{selectedcolorealrect.x, selectedcolorealrect.y}, {(float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255}, {0, 0}},
-    {{selectedcolorealrect.x+selectedcolorealrect.w, selectedcolorealrect.y}, {(float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255}, {0, 0}},
-    {{selectedcolorealrect.x, selectedcolorealrect.y+selectedcolorealrect.y}, {(float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255}, {0, 0}}
+    {{leftselectedcolorealrect.x, leftselectedcolorealrect.y}, {(float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255}, {0, 0}},
+    {{leftselectedcolorealrect.x+leftselectedcolorealrect.w, leftselectedcolorealrect.y}, {(float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255}, {0, 0}},
+    {{leftselectedcolorealrect.x, leftselectedcolorealrect.y+leftselectedcolorealrect.y}, {(float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255}, {0, 0}}
 };
 SDL_Vertex leftcolorpreview[] = {
-    {{selectedcolorealrect.x+selectedcolorealrect.w, selectedcolorealrect.y}, {(float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, 1}, {0, 0}},
-    {{selectedcolorealrect.x+selectedcolorealrect.w, selectedcolorealrect.y+selectedcolorealrect.h}, {(float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, 1}, {0, 0}},
-    {{selectedcolorealrect.x, selectedcolorealrect.y+selectedcolorealrect.y}, {(float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, 1}, {0, 0}}
+    {{leftselectedcolorealrect.x+leftselectedcolorealrect.w, leftselectedcolorealrect.y}, {(float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, 1}, {0, 0}},
+    {{leftselectedcolorealrect.x+leftselectedcolorealrect.w, leftselectedcolorealrect.y+leftselectedcolorealrect.h}, {(float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, 1}, {0, 0}},
+    {{leftselectedcolorealrect.x, leftselectedcolorealrect.y+leftselectedcolorealrect.y}, {(float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, 1}, {0, 0}}
 };
 SDL_Vertex rightcoloralphapreview[] = {
-    {{selectedcolorealrect.x, selectedcolorealrect.y}, {(float)leftcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, (float)rightcolor.a/255}, {0, 0}},
-    {{selectedcolorealrect.x+selectedcolorealrect.w, selectedcolorealrect.y}, {(float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, (float)rightcolor.a/255}, {0, 0}},
-    {{selectedcolorealrect.x, selectedcolorealrect.y+selectedcolorealrect.y}, {(float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, (float)rightcolor.a/255}, {0, 0}}
+    {{rightselectedcolorealrect.x, rightselectedcolorealrect.y}, {(float)leftcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, (float)rightcolor.a/255}, {0, 0}},
+    {{rightselectedcolorealrect.x+rightselectedcolorealrect.w, rightselectedcolorealrect.y}, {(float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, (float)rightcolor.a/255}, {0, 0}},
+    {{rightselectedcolorealrect.x, rightselectedcolorealrect.y+rightselectedcolorealrect.y}, {(float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, (float)rightcolor.a/255}, {0, 0}}
 };
 SDL_Vertex rightcolorpreview[] = {
-    {{selectedcolorealrect.x+selectedcolorealrect.w, selectedcolorealrect.y}, {(float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1}, {0, 0}},
-    {{selectedcolorealrect.x+selectedcolorealrect.w, selectedcolorealrect.y+selectedcolorealrect.h}, {(float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1}, {0, 0}},
-    {{selectedcolorealrect.x, selectedcolorealrect.y+selectedcolorealrect.y}, {(float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1}, {0, 0}}
+    {{rightselectedcolorealrect.x+rightselectedcolorealrect.w, rightselectedcolorealrect.y}, {(float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1}, {0, 0}},
+    {{rightselectedcolorealrect.x+rightselectedcolorealrect.w, rightselectedcolorealrect.y+leftselectedcolorealrect.h}, {(float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1}, {0, 0}},
+    {{rightselectedcolorealrect.x, rightselectedcolorealrect.y+rightselectedcolorealrect.y}, {(float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1}, {0, 0}}
 };
-SDL_FRect colorselector = { 0, 0, 250, 200 };
+SDL_FRect colorselectorui = { 0, 0, 250, 200 };
 bool colorselectorvisible = false;
 
 
@@ -183,7 +189,6 @@ void ditherline(SDL_Renderer * renderer, SDL_Color cola, SDL_Color colb, vec2 st
     int err = distance.x-distance.y;
 
     while (true) {
-        vec2 oldstart = start;
         if (primary){
             ((start.x+start.y)%2==0)?SDL_SetRenderDrawColor(renderer, cola.r, cola.g, cola.b, cola.a):SDL_SetRenderDrawColor(renderer, colb.r, colb.g, colb.b, colb.a);
         }
@@ -201,7 +206,7 @@ void ditherline(SDL_Renderer * renderer, SDL_Color cola, SDL_Color colb, vec2 st
             start.y += mirror.y;
         }
 
-        if (oldstart.x==start.x && oldstart.y==start.y) break;
+        if (std::abs(start.x-end.x)<=1 && std::abs(start.y-end.y)<=1) break;
     }
 }
 
@@ -209,7 +214,7 @@ void ditherline(SDL_Renderer * renderer, SDL_Color cola, SDL_Color colb, vec2 st
 /* Tertiary line function for lighten */
 void lightenline(SDL_Renderer * renderer, vec2 start, vec2 end, bool darken, bool add) {
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 16);
-    if (add) (darken)?SDL_SetRenderDrawBlendMode(renderer, straightdarken):SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD);
+    if (add) ((darken)?SDL_SetRenderDrawBlendMode(renderer, straightdarken):SDL_SetRenderDrawBlendMode(renderer, straightbrighten));
     else SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     vec2 distance = { abs(end.x-start.x), abs(end.y-start.y) };
     vec2 mirror = { (start.x<end.x)?1:-1, (start.y<end.y) ?1:-1 };
@@ -218,7 +223,7 @@ void lightenline(SDL_Renderer * renderer, vec2 start, vec2 end, bool darken, boo
     while (true) {
         SDL_RenderPoint(renderer, start.x, start.y);
 
-        if (std::abs(start.x-end.x)<=1 || std::abs(start.y-end.y)<=1) break;
+        if (std::abs(start.x-end.x)<=1 && std::abs(start.y-end.y)<=1) break;
 
         if (2*err>-distance.y) {
             err -= distance.y;
@@ -273,14 +278,19 @@ int main() {
     toolselectedrect = (SDL_FRect){0, 0, toolsrect.w/3, toolsrect.w/3 };
     cursizerectborder = (SDL_FRect){toolsrect.x, toolsrect.y, toolsrect.w, -toolsrect.w };
     cursizerectinborder = (SDL_FRect){toolsrect.x+4, toolsrect.y-4, toolsrect.w-8, -toolsrect.w+8 };
-    snprintf(tempath, sizeof(tempath), "%s%s", SDL_GetBasePath(), "../Resources/border.bmp");
-    SDL_Surface * pretoolsborder = SDL_LoadBMP(tempath);
-    SDL_Texture * toolsborder = SDL_CreateTextureFromSurface(renderer, pretoolsborder);
+    SDL_Texture * toolsborder = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, toolsrect.w/3, toolsrect.w/3);
     SDL_SetTextureScaleMode(toolsborder, SDL_SCALEMODE_NEAREST);
-    snprintf(tempath, sizeof(tempath), "%s%s", SDL_GetBasePath(), "../Resources/colorselector.bmp");
-    SDL_Surface * tempcolorselector = SDL_LoadBMP(tempath);
-    SDL_Texture * colorselector = SDL_CreateTextureFromSurface(renderer, tempcolorselector);
-    SDL_SetTextureScaleMode(colorselector, SDL_SCALEMODE_NEAREST);
+    SDL_FRect temprects[3] = {{0,0,(float)(int)toolsrect.w/3,(float)(int)toolsrect.w/3},{1,1,(float)(int)toolsrect.w/3-2,(float)(int)toolsrect.w/3-2},{2,2,(float)(int)toolsrect.w/3-4,(float)(int)toolsrect.w/3-4}};
+    SDL_SetRenderTarget(renderer, toolsborder);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer, 255, 215, 0, 255);
+    SDL_RenderRects(renderer, temprects, 2);
+    SDL_SetRenderTarget(renderer, NULL);
+    SDL_Texture * leftcolorselector = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, leftselectedcolorect.w, leftselectedcolorect.h);
+    SDL_Texture * rightcolorselector = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, rightselectedcolorect.w, rightselectedcolorect.h);
+    SDL_SetTextureScaleMode(leftcolorselector, SDL_SCALEMODE_NEAREST);
+    SDL_SetTextureScaleMode(rightcolorselector, SDL_SCALEMODE_NEAREST);
     sprite.push_back(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, resolution.x, resolution.y));
     presprite = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, resolution.x, resolution.y);
     cursorture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, resolution.x, resolution.y);
@@ -308,38 +318,58 @@ int main() {
 
 
     /* Setup variables that require data from textures */
-    selectedcolorealrect = (SDL_FRect){8+((selectedcolorect.w-selectedcolorealrect.w)/2), toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2), selectedcolorealrect.w, selectedcolorealrect.h };
-    leftcoloralphapreview[0].position.x=selectedcolorealrect.x;
-    leftcoloralphapreview[0].position.y=selectedcolorealrect.y;
-    leftcoloralphapreview[1].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
-    leftcoloralphapreview[1].position.y=selectedcolorealrect.y;
-    leftcoloralphapreview[2].position.x=selectedcolorealrect.x;
-    leftcoloralphapreview[2].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
-    leftcolorpreview[0].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
-    leftcolorpreview[0].position.y=selectedcolorealrect.y;
-    leftcolorpreview[1].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
-    leftcolorpreview[1].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
-    leftcolorpreview[2].position.x=selectedcolorealrect.x;
-    leftcolorpreview[2].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
-    selectedcolorealrect = (SDL_FRect){toolsrect.w-selectedcolorect.w+8+((selectedcolorect.w-selectedcolorealrect.w)/2), toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2), selectedcolorealrect.w, selectedcolorealrect.h };
-    rightcoloralphapreview[0].position.x=selectedcolorealrect.x;
-    rightcoloralphapreview[0].position.y=selectedcolorealrect.y;
-    rightcoloralphapreview[1].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
-    rightcoloralphapreview[1].position.y=selectedcolorealrect.y;
-    rightcoloralphapreview[2].position.x=selectedcolorealrect.x;
-    rightcoloralphapreview[2].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
-    rightcolorpreview[0].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
-    rightcolorpreview[0].position.y=selectedcolorealrect.y;
-    rightcolorpreview[1].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
-    rightcolorpreview[1].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
-    rightcolorpreview[2].position.x=selectedcolorealrect.x;
-    rightcolorpreview[2].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
+    leftselectedcolorealrect = (SDL_FRect){ 8+((leftselectedcolorect.w-leftselectedcolorealrect.w)/2), toolsrect.y+toolsrect.h+8+((leftselectedcolorect.h-leftselectedcolorealrect.h)/2), leftselectedcolorealrect.w, leftselectedcolorealrect.h };
+    rightselectedcolorealrect = (SDL_FRect){ toolsrect.w-rightselectedcolorealrect.w+((rightselectedcolorect.w-rightselectedcolorealrect.w)/2), toolsrect.y+toolsrect.h+8+((rightselectedcolorect.h-rightselectedcolorealrect.h)/2), rightselectedcolorealrect.w, rightselectedcolorealrect.h };
+    leftcoloralphapreview[0].position.x=leftselectedcolorealrect.x;
+    leftcoloralphapreview[0].position.y=leftselectedcolorealrect.y;
+    leftcoloralphapreview[1].position.x=leftselectedcolorealrect.x+leftselectedcolorealrect.w;
+    leftcoloralphapreview[1].position.y=leftselectedcolorealrect.y;
+    leftcoloralphapreview[2].position.x=leftselectedcolorealrect.x;
+    leftcoloralphapreview[2].position.y=leftselectedcolorealrect.y+leftselectedcolorealrect.h;
+    leftcolorpreview[0].position.x=leftselectedcolorealrect.x+leftselectedcolorealrect.w;
+    leftcolorpreview[0].position.y=leftselectedcolorealrect.y;
+    leftcolorpreview[1].position.x=leftselectedcolorealrect.x+leftselectedcolorealrect.w;
+    leftcolorpreview[1].position.y=leftselectedcolorealrect.y+leftselectedcolorealrect.h;
+    leftcolorpreview[2].position.x=leftselectedcolorealrect.x;
+    leftcolorpreview[2].position.y=leftselectedcolorealrect.y+leftselectedcolorealrect.h;
+    rightcoloralphapreview[0].position.x=rightselectedcolorealrect.x;
+    rightcoloralphapreview[0].position.y=rightselectedcolorealrect.y;
+    rightcoloralphapreview[1].position.x=rightselectedcolorealrect.x+rightselectedcolorealrect.w;
+    rightcoloralphapreview[1].position.y=rightselectedcolorealrect.y;
+    rightcoloralphapreview[2].position.x=rightselectedcolorealrect.x;
+    rightcoloralphapreview[2].position.y=rightselectedcolorealrect.y+rightselectedcolorealrect.h;
+    rightcolorpreview[0].position.x=rightselectedcolorealrect.x+rightselectedcolorealrect.w;
+    rightcolorpreview[0].position.y=rightselectedcolorealrect.y;
+    rightcolorpreview[1].position.x=rightselectedcolorealrect.x+rightselectedcolorealrect.w;
+    rightcolorpreview[1].position.y=rightselectedcolorealrect.y+rightselectedcolorealrect.h;
+    rightcolorpreview[2].position.x=rightselectedcolorealrect.x;
+    rightcolorpreview[2].position.y=rightselectedcolorealrect.y+rightselectedcolorealrect.h;
+    leftselectedcolorect = (SDL_FRect){8, toolsrect.y+toolsrect.h+8, leftselectedcolorect.w, leftselectedcolorect.h };
+    rightselectedcolorect = (SDL_FRect){toolsrect.w-rightselectedcolorect.w+8, toolsrect.y+toolsrect.h+8, rightselectedcolorect.w, rightselectedcolorect.h };
+    colorselectorui.y = leftselectedcolorect.y-colorselectorui.h;
+    SDL_SetRenderTarget(renderer, leftcolorselector);
+    SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer, gridalt.r, gridalt.g, gridalt.b, gridalt.a);
+    for (int y = -leftselectedcolorect.y; y < (int)(leftselectedcolorect.w/8)+1; y++) {
+        grid.y = (y*8);
+        for (int x = -leftselectedcolorect.x; x < (int)(leftselectedcolorect.h/8); x++) {
+            grid.x = (x*16)-((y%2)*8);
+            SDL_RenderFillRect(renderer, &grid); }}
+    SDL_SetRenderTarget(renderer, rightcolorselector);
+    SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer, gridalt.r, gridalt.g, gridalt.b, gridalt.a);
+    for (int y = -rightselectedcolorect.y; y < (int)(rightselectedcolorect.w/8)+1; y++) {
+        grid.y = (y*8);
+        for (int x = -rightselectedcolorect.x; x < (int)(rightselectedcolorect.h/8); x++) {
+            grid.x = (x*16)-((y%2)*8);
+            SDL_RenderFillRect(renderer, &grid); }}
+    SDL_SetRenderTarget(renderer, NULL);
 
 
     /* Remove unecessary data */
-    SDL_DestroySurface(pretoolsborder);
     SDL_DestroySurface(pretools);
-    SDL_DestroySurface(tempcolorselector);
 
 
     /* Main loop */
@@ -354,9 +384,9 @@ int main() {
 
 
         /* Clear renderer and draw background grid */
-        SDL_SetRenderDrawColor(renderer, 85, 85, 85, 255);
+        SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
         SDL_RenderClear(renderer);
-        SDL_SetRenderDrawColor(renderer, gridC.r, gridC.g, gridC.b, gridC.a);
+        SDL_SetRenderDrawColor(renderer, gridalt.r, gridalt.g, gridalt.b, gridalt.a);
         for (int y = 0; y < (int)(windowsize.y/8)+1; y++) {
             grid.y = (y*8);
             for (int x = 0; x < (int)(windowsize.x/8); x++) {
@@ -371,7 +401,7 @@ int main() {
 
 
         /* Poll inputs */
-        while (SDL_PollEvent(&e) != 0){
+        while (SDL_PollEvent(&e)){
             switch (e.type) {
                 case SDL_EVENT_QUIT:
                     loop = false;
@@ -409,32 +439,32 @@ int main() {
 
 
                     /* Reset color preview position */
-                    selectedcolorealrect = (SDL_FRect){8+((selectedcolorect.w-selectedcolorealrect.w)/2), toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2), selectedcolorealrect.w, selectedcolorealrect.h };
-                    leftcoloralphapreview[0].position.x=selectedcolorealrect.x;
-                    leftcoloralphapreview[0].position.y=selectedcolorealrect.y;
-                    leftcoloralphapreview[1].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
-                    leftcoloralphapreview[1].position.y=selectedcolorealrect.y;
-                    leftcoloralphapreview[2].position.x=selectedcolorealrect.x;
-                    leftcoloralphapreview[2].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
-                    leftcolorpreview[0].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
-                    leftcolorpreview[0].position.y=selectedcolorealrect.y;
-                    leftcolorpreview[1].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
-                    leftcolorpreview[1].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
-                    leftcolorpreview[2].position.x=selectedcolorealrect.x;
-                    leftcolorpreview[2].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
-                    selectedcolorealrect = (SDL_FRect){toolsrect.w-selectedcolorect.w+8+((selectedcolorect.w-selectedcolorealrect.w)/2), toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2), selectedcolorealrect.w, selectedcolorealrect.h };
-                    rightcoloralphapreview[0].position.x=selectedcolorealrect.x;
-                    rightcoloralphapreview[0].position.y=selectedcolorealrect.y;
-                    rightcoloralphapreview[1].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
-                    rightcoloralphapreview[1].position.y=selectedcolorealrect.y;
-                    rightcoloralphapreview[2].position.x=selectedcolorealrect.x;
-                    rightcoloralphapreview[2].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
-                    rightcolorpreview[0].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
-                    rightcolorpreview[0].position.y=selectedcolorealrect.y;
-                    rightcolorpreview[1].position.x=selectedcolorealrect.x+selectedcolorealrect.w;
-                    rightcolorpreview[1].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
-                    rightcolorpreview[2].position.x=selectedcolorealrect.x;
-                    rightcolorpreview[2].position.y=selectedcolorealrect.y+selectedcolorealrect.h;
+                    leftselectedcolorealrect = (SDL_FRect){ 8+((leftselectedcolorect.w-leftselectedcolorealrect.w)/2), toolsrect.y+toolsrect.h+8+((leftselectedcolorect.h-leftselectedcolorealrect.h)/2), leftselectedcolorealrect.w, leftselectedcolorealrect.h };
+                    rightselectedcolorealrect = (SDL_FRect){ toolsrect.w-rightselectedcolorealrect.w+((rightselectedcolorect.w-rightselectedcolorealrect.w)/2), toolsrect.y+toolsrect.h+8+((rightselectedcolorect.h-rightselectedcolorealrect.h)/2), rightselectedcolorealrect.w, rightselectedcolorealrect.h };
+                    leftcoloralphapreview[0].position.x=leftselectedcolorealrect.x;
+                    leftcoloralphapreview[0].position.y=leftselectedcolorealrect.y;
+                    leftcoloralphapreview[1].position.x=leftselectedcolorealrect.x+leftselectedcolorealrect.w;
+                    leftcoloralphapreview[1].position.y=leftselectedcolorealrect.y;
+                    leftcoloralphapreview[2].position.x=leftselectedcolorealrect.x;
+                    leftcoloralphapreview[2].position.y=leftselectedcolorealrect.y+leftselectedcolorealrect.h;
+                    leftcolorpreview[0].position.x=leftselectedcolorealrect.x+leftselectedcolorealrect.w;
+                    leftcolorpreview[0].position.y=leftselectedcolorealrect.y;
+                    leftcolorpreview[1].position.x=leftselectedcolorealrect.x+leftselectedcolorealrect.w;
+                    leftcolorpreview[1].position.y=leftselectedcolorealrect.y+leftselectedcolorealrect.h;
+                    leftcolorpreview[2].position.x=leftselectedcolorealrect.x;
+                    leftcolorpreview[2].position.y=leftselectedcolorealrect.y+leftselectedcolorealrect.h;
+                    rightcoloralphapreview[0].position.x=rightselectedcolorealrect.x;
+                    rightcoloralphapreview[0].position.y=rightselectedcolorealrect.y;
+                    rightcoloralphapreview[1].position.x=rightselectedcolorealrect.x+rightselectedcolorealrect.w;
+                    rightcoloralphapreview[1].position.y=rightselectedcolorealrect.y;
+                    rightcoloralphapreview[2].position.x=rightselectedcolorealrect.x;
+                    rightcoloralphapreview[2].position.y=rightselectedcolorealrect.y+rightselectedcolorealrect.h;
+                    rightcolorpreview[0].position.x=rightselectedcolorealrect.x+rightselectedcolorealrect.w;
+                    rightcolorpreview[0].position.y=rightselectedcolorealrect.y;
+                    rightcolorpreview[1].position.x=rightselectedcolorealrect.x+rightselectedcolorealrect.w;
+                    rightcolorpreview[1].position.y=rightselectedcolorealrect.y+rightselectedcolorealrect.h;
+                    rightcolorpreview[2].position.x=rightselectedcolorealrect.x;
+                    rightcolorpreview[2].position.y=rightselectedcolorealrect.y+rightselectedcolorealrect.h;
 
 
                     /* Reset visual borders */
@@ -458,6 +488,33 @@ int main() {
                     canvasborders[5].position = (SDL_FPoint){ canvas.x+canvas.w, canvas.y };
                     canvasborders[6].position = (SDL_FPoint){ canvas.x+canvas.w, canvas.y+canvas.h };
                     canvasborders[7].position = (SDL_FPoint){ precanvas.x+precanvas.w, precanvas.y+precanvas.h };
+
+
+                    /* Reset UI */
+                    colorselectorui.y = leftselectedcolorealrect.y-colorselectorui.h;
+                    leftselectedcolorect = (SDL_FRect){8, toolsrect.y+toolsrect.h+8, leftselectedcolorect.w, leftselectedcolorect.h };
+                    rightselectedcolorect = (SDL_FRect){toolsrect.w-rightselectedcolorect.w+8, toolsrect.y+toolsrect.h+8, rightselectedcolorect.w, rightselectedcolorect.h };
+                    std::cout << leftselectedcolorect.y << std::endl;
+                    SDL_SetRenderTarget(renderer, leftcolorselector);
+                    SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
+                    SDL_RenderClear(renderer);
+                    SDL_SetRenderDrawColor(renderer, gridalt.r, gridalt.g, gridalt.b, gridalt.a);
+                    for (int y = -leftselectedcolorect.y; y < (int)(leftselectedcolorect.w/8)+1; y++) {
+                        grid.y = (y*8);
+                        for (int x = -leftselectedcolorect.x; x < (int)(leftselectedcolorect.h/8); x++) {
+                            grid.x = (x*16)-((y%2)*8);
+                            SDL_RenderFillRect(renderer, &grid); }}
+                    SDL_SetRenderTarget(renderer, rightcolorselector);
+                    SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
+                    SDL_RenderClear(renderer);
+                    SDL_SetRenderDrawColor(renderer, gridalt.r, gridalt.g, gridalt.b, gridalt.a);
+                    for (int y = -rightselectedcolorect.y; y < (int)(rightselectedcolorect.w/8)+1; y++) {
+                        grid.y = (y*8);
+                        for (int x = -rightselectedcolorect.x; x < (int)(rightselectedcolorect.h/8); x++) {
+                            grid.x = (x*16)-((y%2)*8);
+                            SDL_RenderFillRect(renderer, &grid); }}
+                    SDL_SetRenderTarget(renderer, NULL);
+                    break;
 
 
                 /* Zoom canvas */
@@ -510,6 +567,7 @@ int main() {
                         /* Reset pen size text */
                         cursizetextrect = (SDL_FRect){cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2), cursizerectborder.y+cursizerectborder.h-cursizetextrect.h, cursizetextrect.w, cursizetextrect.h };
                     }
+                    break;
 
 
 
@@ -526,6 +584,15 @@ int main() {
                 /* Interact with UI */
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
                     if (contained(mouse, toolsrect) && !(toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)]=="")) currentool=((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3);
+                    if (contained(mouse, leftselectedcolorealrect)) {
+                        colorselectorvisible = true;
+                        colorselectorui.x = leftselectedcolorect.x;
+                    }
+                    else if (contained(mouse, rightselectedcolorealrect)) {
+                        colorselectorvisible = true;
+                        colorselectorui.x = rightselectedcolorect.x;
+                    }
+                    else { colorselectorvisible = false; }
                     lastmouse = mouse;
                     break;
 
@@ -555,7 +622,7 @@ int main() {
                     if ((mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && currentool == 5 && contained(lastmouse, canvas)) {
                         if (keystates[SDL_SCANCODE_LSHIFT] || oldshift) {
                             SDL_SetRenderTarget(renderer, sprite[frame]);
-                            SDL_SetTextureBlendMode(presprite, (keystates[SDL_SCANCODE_LCTRL])?SDL_SetRenderDrawBlendMode(renderer, straightdarken):SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD));
+                            SDL_SetTextureBlendMode(presprite, (mousebitmask & SDL_BUTTON_RMASK)?straightdarken:straightbrighten);
                             SDL_RenderTexture(renderer, presprite, NULL, &spriterect);
                             SDL_SetTextureBlendMode(presprite, SDL_BLENDMODE_BLEND);
                             SDL_SetRenderTarget(renderer, NULL);
@@ -563,6 +630,7 @@ int main() {
                         }
                     }
                     if (contained(lastmouse, canvas)) undupdatequeued = true;
+                    break;
 
 
                 case SDL_EVENT_KEY_DOWN:
@@ -608,6 +676,7 @@ int main() {
                         canvasborders[6].position = (SDL_FPoint){ canvas.x+canvas.w, canvas.y+canvas.h };
                         canvasborders[7].position = (SDL_FPoint){ precanvas.x+precanvas.w, precanvas.y+precanvas.h };
                     }
+                    break;
             }
         }
 
@@ -728,7 +797,7 @@ int main() {
                         }
                         for (int y = 0; y < (int)cursize; y++) {
                             for (int x = 0; x < (int)cursize; x++) {
-                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, keystates[SDL_SCANCODE_LCTRL], false);
+                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), false);
                             }
                         }
                         SDL_SetRenderTarget(renderer, NULL);
@@ -746,7 +815,7 @@ int main() {
                         }
                         for (int y = 0; y < (int)cursize; y++) {
                             for (int x = 0; x < (int)cursize; x++) {
-                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, keystates[SDL_SCANCODE_LCTRL], true);
+                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), true);
                             }
                         }
                         SDL_SetRenderTarget(renderer, NULL);
@@ -787,7 +856,11 @@ int main() {
         }
         if ((mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && (currentool == 4 || currentool == 5) && contained(lastmouse, canvas)) {
             if (skiprespriterender) skiprespriterender = false;
-            else SDL_RenderTexture(renderer, presprite, NULL, &canvas);
+            else {
+                if (currentool == 5) SDL_SetTextureBlendMode(presprite, (mousebitmask & SDL_BUTTON_RMASK)?straightdarken:straightbrighten);
+                SDL_RenderTexture(renderer, presprite, NULL, &canvas);
+                if (currentool == 5) SDL_SetTextureBlendMode(presprite, SDL_BLENDMODE_BLEND);
+            }
         }
         if (contained(mouse, canvas) && !(mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK) && focus){
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
@@ -830,22 +903,22 @@ int main() {
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         cursizerect = (SDL_FRect){(float)limit(-((canvas.w/resolution.x)*(int)cursize)/2+cursizerectborder.x+(cursizerectborder.w/2), cursizerectinborder.x), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize), NULL, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*(int)cursize, NULL, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*(int)cursize, NULL, -cursizerectinborder.h) };
         SDL_RenderFillRect(renderer, &cursizerect);
-        selectedcolorect = (SDL_FRect){8, toolsrect.y+toolsrect.h+8, selectedcolorect.w, selectedcolorect.h };
-        (contained(mouse, selectedcolorect))?SDL_SetRenderDrawColor(renderer, 136, 136, 136, 255):SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
-        SDL_RenderFillRect(renderer, &selectedcolorect);
-        selectedcolorect = (SDL_FRect){toolsrect.w-selectedcolorect.w+8, toolsrect.y+toolsrect.h+8, selectedcolorect.w, selectedcolorect.h };
-        (contained(mouse, selectedcolorect))?SDL_SetRenderDrawColor(renderer, 136, 136, 136, 255):SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
-        SDL_RenderFillRect(renderer, &selectedcolorect);
+        (contained(mouse, leftselectedcolorect))?SDL_SetRenderDrawColor(renderer, 136, 136, 136, 255):SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
+        SDL_RenderFillRect(renderer, &leftselectedcolorect);
+        (contained(mouse, rightselectedcolorect))?SDL_SetRenderDrawColor(renderer, 136, 136, 136, 255):SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
+        SDL_RenderFillRect(renderer, &rightselectedcolorect);
         SDL_SetRenderDrawColor(renderer, leftcolor.r, leftcolor.g, leftcolor.b, leftcolor.a);
-        selectedcolorealrect = (SDL_FRect){8+((selectedcolorect.w-selectedcolorealrect.w)/2), toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2), selectedcolorealrect.w, selectedcolorealrect.h };
-        SDL_RenderTexture(renderer, colorselector, NULL, &selectedcolorealrect);
+        SDL_RenderTexture(renderer, leftcolorselector, NULL, &leftselectedcolorealrect);
         SDL_RenderGeometry(renderer, NULL, leftcoloralphapreview, 3, NULL, 0);
         SDL_RenderGeometry(renderer, NULL, leftcolorpreview, 3, NULL, 0);
         SDL_SetRenderDrawColor(renderer, rightcolor.r, rightcolor.g, rightcolor.b, rightcolor.a);
-        selectedcolorealrect = (SDL_FRect){toolsrect.w-selectedcolorect.w+8+((selectedcolorect.w-selectedcolorealrect.w)/2), toolsrect.y+toolsrect.h+8+((selectedcolorect.h-selectedcolorealrect.h)/2), selectedcolorealrect.w, selectedcolorealrect.h };
-        SDL_RenderTexture(renderer, colorselector, NULL, &selectedcolorealrect);
+        SDL_RenderTexture(renderer, rightcolorselector, NULL, &rightselectedcolorealrect);
         SDL_RenderGeometry(renderer, NULL, rightcoloralphapreview, 3, NULL, 0);
         SDL_RenderGeometry(renderer, NULL, rightcolorpreview, 3, NULL, 0);
+        if (colorselectorvisible) {
+            SDL_SetRenderDrawColor(renderer, 136, 136, 136, 255);
+            SDL_RenderFillRect(renderer, &colorselectorui);
+        }
 
 
         /* Render UI text */
