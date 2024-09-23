@@ -23,7 +23,7 @@ set_target_properties(repiskel PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURC
 target_link_libraries(repiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/libSDL3.0.dylib)
 target_link_libraries(repiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/libSDL3_ttf.0.0.0.dylib)
 # target_link_libraries(repiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/libgtk-4.1.dylib)
-target_include_directories(repiskel PRIVATE /opt/homebrew/include)
+target_include_directories(repiskel PRIVATE /usr/local/include)
 
 
 # Make directories for macos app
