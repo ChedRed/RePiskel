@@ -1,5 +1,5 @@
-#include "SDL3/SDL_mouse.h"
-#include "SDL3/SDL_rect.h"
+#include "SDL3/SDL_blendmode.h"
+#include "SDL3/SDL_render.h"
 #include <cstdlib>
 #include <iostream>
 #include <cmath>
@@ -183,11 +183,11 @@ double lerp(double a, double b, double c) { return a+((b-a)*c); }
 
 
 /* Limit function */
-double limit(double value, std::optional<double> min = NULL, std::optional<double> max = NULL) { return ((min!=NULL)?((max!=NULL)?(value>max?max:(value<min?min:value)):(value<min?min:value)):((max!=NULL)?(value>max?max:value):value)).value(); }
+double limit(double value, std::optional<double> min = std::nullopt, std::optional<double> max = std::nullopt) { return ((min.has_value())?((max.has_value())?(value>max?max:(value<min?min:value)):(value<min?min:value)):((max.has_value())?(value>max?max:value):value)).value(); }
 
 
 /* Within limit function */
-bool inlimit(double value, std::optional<double> min = NULL, std::optional<double> max = NULL) { return (min!=NULL)?((max!=NULL)?(value<max&&value>=min):(value>=min)):((max!=NULL)?(value<max):true); }
+bool inlimit(double value, std::optional<double> min = std::nullopt, std::optional<double> max = std::nullopt) { return (min.has_value())?((max.has_value())?(value<max&&value>=min):(value>=min)):((max.has_value())?(value<max):true); }
 
 
 /* Contained function */
@@ -259,28 +259,26 @@ SDL_Color RGBfHSV(double h, double s, double v) {
     float c = v*s;
     float x = c*(1-std::abs(std::fmod(h/60, 2)-1));
     float m = v-c;
-
     if (inlimit(h,0,60)) { recolor.x = c; recolor.y = x; recolor.z = 0; }
     else if (inlimit(h,60,120)) { recolor.x = x; recolor.y = c; recolor.z = 0; }
     else if (inlimit(h,120,180)) { recolor.x = 0; recolor.y = c; recolor.z = x; }
     else if (inlimit(h,180,240)) { recolor.x = 0; recolor.y = x; recolor.z = c; }
     else if (inlimit(h,240,300)) { recolor.x = x; recolor.y = 0; recolor.z = c; }
     else { recolor.x = c; recolor.y = 0; recolor.z = x; }
-
     return (SDL_Color){ (Uint8)((recolor.x+m)*255), (Uint8)((recolor.y+m)*255), (Uint8)((recolor.z+m)*255), 255 };
 }
 
 
 fvec3 HSVfRGB(int r, int g, int b) {
-    fvec3 rehsv = { (float)r/255, (float)g/255, (float)b/255 };
-    float cmax = std::max(std::max(rehsv.x,rehsv.y), rehsv.z);
-    float cmin = std::min(std::min(rehsv.x,rehsv.y), rehsv.z);
+    fvec3 rehsv = (fvec3){ (float)r/255, (float)g/255, (float)b/255 };
+    fvec3 realhsv;
+    float cmax = std::max(rehsv.x, std::max(rehsv.y, rehsv.z));
+    float cmin = std::min(rehsv.x, std::min(rehsv.y, rehsv.z));
     float delta = cmax-cmin;
-
-    rehsv.x = (cmax==cmin)?0:((cmax==r)?std::fmod((60*((rehsv.y-rehsv.z)/delta)+360), 360):((cmax==g)?std::fmod((60*((rehsv.z-rehsv.x)/delta)+120), 360):std::fmod((60*((rehsv.x-rehsv.y)/delta)+240), 360)));
-    rehsv.y = (cmax==0)?0:(delta/cmax)*100;
-    rehsv.z = cmax*100;
-    return rehsv;
+    realhsv.x = ((cmax==cmin)?0:fmod(((cmax==rehsv.x)?(60*((rehsv.y-rehsv.z)/delta)+360):((cmax==rehsv.y)?(60*((rehsv.z-rehsv.x)/delta)+120):(60*((rehsv.x-rehsv.y)/delta)+240))), 360));
+    realhsv.y = (cmax==0)?0:(delta/cmax);
+    realhsv.z = cmax;
+    return realhsv;
 }
 
 
@@ -360,6 +358,57 @@ int main() {
             SDL_RenderPoint(renderer, colorselectorui.w-130+x, 12+y);
         }
     }
+    SDL_SetRenderDrawColor(renderer, 32, 32, 32, 255);
+    colorselectemprect = (SDL_FRect){ colorselectorui.w-159, 11, 22, colorselectorui.h-22 };
+    SDL_RenderFillRect(renderer, &colorselectemprect);
+    for (int y = 0; y < 90; y++) {
+        tempcolor = (SDL_Color){ (Uint8)lerp(43,0,(double)y/90*(double)y/90*(double)y/90), (Uint8)lerp(43,0,(double)y/90*(double)y/90*(double)y/90), (Uint8)lerp(43,0,(double)y/90*(double)y/90*(double)y/90), 255 };
+        SDL_SetRenderDrawColor(renderer, tempcolor.r, tempcolor.g, tempcolor.b, tempcolor.a);
+        for (int x = 0; x < 20; x++) {
+            SDL_RenderPoint(renderer, colorselectorui.w-139-x, 12+y);
+        }
+    }
+    SDL_Texture * colorselectoruitems[] = {
+        SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 24, 10),
+        SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 12, 12),
+        SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 24, 10)
+    };
+    SDL_FRect colorselectoruitemsrects[] = {
+        { 0, 0, 24, 10 },
+        { 1, 1, 22, 8 },
+        { 3, 3, 18, 4 },
+        { 0, 0, 12, 12 },
+        { 1, 1, 10, 10 },
+        { 3, 3, 6, 6 },
+        { 0, 0, 24, 10 },
+    };
+    SDL_SetRenderTarget(renderer, colorselectoruitems[0]);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 64);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderFillRect(renderer, &colorselectoruitemsrects[1]);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_RenderFillRect(renderer, &colorselectoruitemsrects[2]);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 127);
+    SDL_RenderRect(renderer, &colorselectoruitemsrects[2]);
+    SDL_SetRenderTarget(renderer, colorselectoruitems[1]);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 64);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderFillRect(renderer, &colorselectoruitemsrects[4]);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_RenderFillRect(renderer, &colorselectoruitemsrects[5]);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 127);
+    SDL_RenderRect(renderer, &colorselectoruitemsrects[5]);
+    SDL_SetRenderTarget(renderer, colorselectoruitems[2]);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 64);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderFillRect(renderer, &colorselectoruitemsrects[1]);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_RenderFillRect(renderer, &colorselectoruitemsrects[2]);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 127);
+    SDL_RenderRect(renderer, &colorselectoruitemsrects[2]);
     SDL_Texture * leftcolorselector = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, leftselectedcolorealrect.w, leftselectedcolorealrect.h);
     SDL_Texture * rightcolorselector = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, rightselectedcolorealrect.w, rightselectedcolorealrect.h);
     sprite.push_back(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, resolution.x, resolution.y));
@@ -421,9 +470,9 @@ int main() {
     rightselectedcolorect = (SDL_FRect){toolsrect.w-rightselectedcolorect.w+8, toolsrect.y+toolsrect.h+8, rightselectedcolorect.w, rightselectedcolorect.h };
     colorselectorui.y = leftselectedcolorealrect.y+leftselectedcolorealrect.h+12;
     colorselectelements[0] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-33, colorselectorui.y+12, colorselectelements[0].w, colorselectelements[0].h };
-    colorselectelements[1] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-220, colorselectorui.y+12, colorselectelements[1].w, colorselectelements[1].h };
-    colorselectelements[2] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-255, colorselectorui.y+12, colorselectelements[2].w, colorselectelements[2].h };
-    cursizerect = (SDL_FRect){(float)limit(-((canvas.w/resolution.x)*(int)cursize)/2+cursizerectborder.x+(cursizerectborder.w/2), cursizerectinborder.x), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize), NULL, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*(int)cursize, NULL, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*(int)cursize, NULL, -cursizerectinborder.h) };
+    colorselectelements[1] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-130, colorselectorui.y+12, colorselectelements[1].w, colorselectelements[1].h };
+    colorselectelements[2] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-160, colorselectorui.y+12, colorselectelements[2].w, colorselectelements[2].h };
+    cursizerect = (SDL_FRect){(float)limit((cursizerectinborder.x+(cursizerectinborder.w/2)-((canvas.w/resolution.x)/2*(int)cursize)), cursizerectinborder.x, 100), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize), std::nullopt, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*(int)cursize, std::nullopt, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*(int)cursize, std::nullopt, -cursizerectinborder.h) };
     SDL_SetRenderTarget(renderer, leftcolorselector);
     SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
     SDL_RenderClear(renderer);
@@ -568,7 +617,11 @@ int main() {
 
 
                     /* Reset UI */
+                    cursizerect = (SDL_FRect){(float)limit((cursizerectinborder.x+(cursizerectinborder.w/2)-((canvas.w/resolution.x)/2*(int)cursize)), cursizerectinborder.x, 100), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize), std::nullopt, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*(int)cursize, std::nullopt, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*(int)cursize, std::nullopt, -cursizerectinborder.h) };
                     colorselectorui.y = leftselectedcolorealrect.y+leftselectedcolorealrect.h+12;
+                    colorselectelements[0] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-34, colorselectorui.y+12, colorselectelements[0].w, colorselectelements[0].h };
+                    colorselectelements[1] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-132, colorselectorui.y+12, colorselectelements[1].w, colorselectelements[1].h };
+                    colorselectelements[2] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-164, colorselectorui.y+12, colorselectelements[2].w, colorselectelements[2].h };
                     leftselectedcolorect = (SDL_FRect){8, toolsrect.y+toolsrect.h+8, leftselectedcolorect.w, leftselectedcolorect.h };
                     rightselectedcolorect = (SDL_FRect){toolsrect.w-rightselectedcolorect.w+8, toolsrect.y+toolsrect.h+8, rightselectedcolorect.w, rightselectedcolorect.h };
                     SDL_SetRenderTarget(renderer, leftcolorselector);
@@ -643,7 +696,7 @@ int main() {
                         /* Reset pen size text */
                         cursizetextrect = (SDL_FRect){cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2), cursizerectborder.y+cursizerectborder.h-cursizetextrect.h, cursizetextrect.w, cursizetextrect.h };
                     }
-                    cursizerect = (SDL_FRect){(float)limit(-((canvas.w/resolution.x)*(int)cursize)/2+cursizerectborder.x+(cursizerectborder.w/2), cursizerectinborder.x), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize), NULL, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*(int)cursize, NULL, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*(int)cursize, NULL, -cursizerectinborder.h) };
+                    cursizerect = (SDL_FRect){(float)limit((cursizerectinborder.x+(cursizerectinborder.w/2)-((canvas.w/resolution.x)/2*(int)cursize)), cursizerectinborder.x, 100), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize), std::nullopt, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*(int)cursize, std::nullopt, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*(int)cursize, std::nullopt, -cursizerectinborder.h) };
                     break;
 
 
@@ -664,8 +717,17 @@ int main() {
                     colorselectorvisible = (e.button.button == SDL_BUTTON_LMASK && (contained(mouse, leftselectedcolorect) || contained(mouse, rightselectedcolorect) || (contained(mouse, colorselectorui) && colorselectorvisible)));
                     if (colorselectorvisible && !contained(mouse, colorselectorui) && e.button.button == SDL_BUTTON_LMASK) {
                         leftcolorchanging = contained(mouse, leftselectedcolorect);
-                        fvec3 tempcolor = (leftcolorchanging)?HSVfRGB(leftcolor.r, leftcolor.g, leftcolor.b):HSVfRGB(rightcolor.r, rightcolor.g, rightcolor.b);
-                        HSVA = (fvec4){ tempcolor.x, tempcolor.y, tempcolor.z, (leftcolorchanging)?(float)leftcolor.a:rightcolor.a };
+                        fvec3 tempvecolor = (leftcolorchanging)?HSVfRGB(leftcolor.r, leftcolor.g, leftcolor.b):HSVfRGB(rightcolor.r, rightcolor.g, rightcolor.b);
+                        HSVA = (fvec4){ tempvecolor.x, tempvecolor.y, tempvecolor.z, ((leftcolorchanging)?(float)leftcolor.a/255:(float)rightcolor.a/255) };
+                        SDL_SetRenderTarget(renderer, colorselector);
+                        for (int y = 0; y < 90; y++){
+                            for (int x = 0; x < 90; x++){
+                                tempcolor = RGBfHSV(HSVA.w, (double)x/90, 1-((double)y/90));
+                                SDL_SetRenderDrawColor(renderer, tempcolor.r, tempcolor.g, tempcolor.b, tempcolor.a);
+                                SDL_RenderPoint(renderer, colorselectorui.w-130+x, 12+y);
+                            }
+                        }
+                        SDL_SetRenderTarget(renderer, NULL);
                     }
                     lastmouse = mouse;
                     break;
@@ -976,11 +1038,56 @@ int main() {
         SDL_RenderFillRect(renderer, &cursizerectinborder);
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL_RenderFillRect(renderer, &cursizerect);
-        (contained(mouse, leftselectedcolorect) || (leftcolorchanging && colorselectorvisible))?SDL_SetRenderDrawColor(renderer, 136, 136, 136, 255):SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
+        ((contained(mouse, leftselectedcolorect) && !(mousebitmask & SDL_BUTTON_LMASK)) || (leftcolorchanging && colorselectorvisible))?SDL_SetRenderDrawColor(renderer, 136, 136, 136, 255):SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
         SDL_RenderFillRect(renderer, &leftselectedcolorect);
-        (contained(mouse, rightselectedcolorect) || (!leftcolorchanging && colorselectorvisible))?SDL_SetRenderDrawColor(renderer, 136, 136, 136, 255):SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
+        ((contained(mouse, rightselectedcolorect) && !(mousebitmask & SDL_BUTTON_LMASK)) || (!leftcolorchanging && colorselectorvisible))?SDL_SetRenderDrawColor(renderer, 136, 136, 136, 255):SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
         SDL_RenderFillRect(renderer, &rightselectedcolorect);
         SDL_SetRenderDrawColor(renderer, leftcolor.r, leftcolor.g, leftcolor.b, leftcolor.a);
+        if (colorselectorvisible) {
+            SDL_RenderTexture(renderer, colorselector, NULL, &colorselectorui);
+            if (mousebitmask & SDL_BUTTON_LMASK) {
+                if (contained(lastmouse, colorselectelements[0])) {
+                    HSVA.w = limit((mouse.y-colorselectelements[0].y)*(360/colorselectelements[0].h), 0, 360);
+                    SDL_SetRenderTarget(renderer, colorselector);
+                    for (int y = 0; y < 90; y++){
+                        for (int x = 0; x < 90; x++){
+                            tempcolor=RGBfHSV(HSVA.w, (double)x/90, 1-((double)y/90));
+                            SDL_SetRenderDrawColor(renderer, tempcolor.r, tempcolor.g, tempcolor.b, tempcolor.a);
+                            SDL_RenderPoint(renderer, colorselectorui.w-130+x, 12+y);
+                        }
+                    }
+                    SDL_SetRenderTarget(renderer, NULL);
+                }
+                else if (contained(lastmouse, colorselectelements[1])) {
+                    HSVA.x = limit((mouse.x-colorselectelements[1].x)/colorselectelements[1].w, 0, 1);
+                    HSVA.y = limit(1-(mouse.y-colorselectelements[1].y)/colorselectelements[1].h, 0, 1);
+                }
+                else if (contained(lastmouse, colorselectelements[2])) {
+                    HSVA.z = limit((mouse.y-colorselectelements[0].y)/colorselectelements[0].h, 0, 1);
+                }
+                tempcolor = RGBfHSV(HSVA.w, HSVA.x, HSVA.y);
+                if (leftcolorchanging) leftcolor = (SDL_Color){ tempcolor.r, tempcolor.g, tempcolor.b, (Uint8)(HSVA.z*255) };
+                else rightcolor = (SDL_Color){ tempcolor.r, tempcolor.g, tempcolor.b, (Uint8)(HSVA.z*255) };
+                leftcoloralphapreview[0].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255 };
+                leftcoloralphapreview[1].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255 };
+                leftcoloralphapreview[2].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255 };
+                leftcolorpreview[0].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, 1 };
+                leftcolorpreview[1].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, 1 };
+                leftcolorpreview[2].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, 1 };
+                rightcoloralphapreview[0].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, (float)rightcolor.a/255 };
+                rightcoloralphapreview[1].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, (float)rightcolor.a/255 };
+                rightcoloralphapreview[2].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, (float)rightcolor.a/255 };
+                rightcolorpreview[0].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1 };
+                rightcolorpreview[1].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1 };
+                rightcolorpreview[2].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1 };
+            }
+            colorselectoruitemsrects[0] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-34, (float)(int)(colorselectorui.y+7+((HSVA.w/360)*90)), colorselectoruitemsrects[0].w, colorselectoruitemsrects[0].h };
+            SDL_RenderTexture(renderer, colorselectoruitems[0], NULL, &colorselectoruitemsrects[0]);
+            colorselectoruitemsrects[3] = (SDL_FRect){ (float)(int)(colorselectorui.x+colorselectorui.w-136+(HSVA.x*90)), (float)(int)(colorselectorui.y+6+((1-HSVA.y)*90)), colorselectoruitemsrects[3].w, colorselectoruitemsrects[3].h };
+            SDL_RenderTexture(renderer, colorselectoruitems[1], NULL, &colorselectoruitemsrects[3]);
+            colorselectoruitemsrects[6] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-160, (float)(int)(colorselectorui.y+7+(HSVA.z*90)), colorselectoruitemsrects[0].w, colorselectoruitemsrects[0].h };
+            SDL_RenderTexture(renderer, colorselectoruitems[2], NULL, &colorselectoruitemsrects[6]);
+        }
         SDL_RenderTexture(renderer, leftcolorselector, NULL, &leftselectedcolorealrect);
         SDL_RenderGeometry(renderer, NULL, leftcoloralphapreview, 3, NULL, 0);
         SDL_RenderGeometry(renderer, NULL, leftcolorpreview, 3, NULL, 0);
@@ -988,34 +1095,6 @@ int main() {
         SDL_RenderTexture(renderer, rightcolorselector, NULL, &rightselectedcolorealrect);
         SDL_RenderGeometry(renderer, NULL, rightcoloralphapreview, 3, NULL, 0);
         SDL_RenderGeometry(renderer, NULL, rightcolorpreview, 3, NULL, 0);
-        if (colorselectorvisible) {
-            SDL_RenderTexture(renderer, colorselector, NULL, &colorselectorui);
-            if (mousebitmask & SDL_BUTTON_LMASK) {
-                if (contained(lastmouse, colorselectelements[0])) {
-                    HSVA.w = limit((mouse.y-colorselectelements[0].y)*(360/colorselectelements[0].h), 0, 360);
-                }
-                else if (contained(lastmouse, colorselectelements[1])) {
-                    HSVA.x = limit((mouse.x-colorselectelements[1].x)/colorselectelements[1].w, 0, 1);
-                    HSVA.y = limit((mouse.y-colorselectelements[1].y)/colorselectelements[1].h, 0, 1);
-                }
-            }
-            else if (oldmousedown) {
-                tempcolor = RGBfHSV(HSVA.w, HSVA.x, HSVA.y);
-                if (leftcolorchanging) leftcolor = (SDL_Color){ tempcolor.r, tempcolor.g, tempcolor.b, (Uint8)(HSVA.z*255) };
-                else rightcolor = (SDL_Color){ tempcolor.r, tempcolor.g, tempcolor.b, (Uint8)(HSVA.z*255) };
-                std::cout << "Set hsv " << HSVA.w << ", " << HSVA.x << ", " << HSVA.y << std::endl;
-                std::cout << "Set color " << tempcolor.r << ", " << tempcolor.g << ", " << tempcolor.b << std::endl;
-            }
-            SDL_SetRenderTarget(renderer, colorselector);
-            for (int y = 0; y < 90; y++){
-                for (int x = 0; x < 90; x++){
-                    tempcolor=RGBfHSV(HSVA.w, (double)x/90, 1-((double)y/90));
-                    SDL_SetRenderDrawColor(renderer, tempcolor.r, tempcolor.g, tempcolor.b, tempcolor.a);
-                    SDL_RenderPoint(renderer, colorselectorui.w-130+x, 12+y);
-                }
-            }
-            SDL_SetRenderTarget(renderer, NULL);
-        }
 
 
         /* Render UI text */
