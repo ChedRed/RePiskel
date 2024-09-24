@@ -1,5 +1,5 @@
-#include "SDL3/SDL_blendmode.h"
 #include "SDL3/SDL_render.h"
+#include "SDL3/SDL_surface.h"
 #include <cstdlib>
 #include <iostream>
 #include <cmath>
@@ -66,6 +66,7 @@ fvec2 canvasize = { resratio.x*((resolution.x<resolution.y)?precanvas.h:precanva
 fvec2 oldcanvasize = canvasize;
 SDL_FRect canvas = { canvascenter.x-(canvasize.x/2), canvascenter.y-(canvasize.y/2), canvasize.x, canvasize.y };
 SDL_Texture * presprite;
+SDL_Surface * prespritesurface;
 void* prespritepixels;
 int prespritepitch;
 std::vector<SDL_Texture * > sprite;
@@ -362,7 +363,7 @@ int main() {
     colorselectemprect = (SDL_FRect){ colorselectorui.w-159, 11, 22, colorselectorui.h-22 };
     SDL_RenderFillRect(renderer, &colorselectemprect);
     for (int y = 0; y < 90; y++) {
-        tempcolor = (SDL_Color){ (Uint8)lerp(43,0,(double)y/90*(double)y/90*(double)y/90), (Uint8)lerp(43,0,(double)y/90*(double)y/90*(double)y/90), (Uint8)lerp(43,0,(double)y/90*(double)y/90*(double)y/90), 255 };
+        tempcolor = (SDL_Color){ (Uint8)lerp(255, 43, std::sqrt((double)y/90)), (Uint8)lerp(255, 43, std::sqrt((double)y/90)), (Uint8)lerp(255, 43, std::sqrt((double)y/90)), 255 };
         SDL_SetRenderDrawColor(renderer, tempcolor.r, tempcolor.g, tempcolor.b, tempcolor.a);
         for (int x = 0; x < 20; x++) {
             SDL_RenderPoint(renderer, colorselectorui.w-139-x, 12+y);
@@ -957,6 +958,13 @@ int main() {
                         SDL_SetRenderTarget(renderer, NULL);
                     }
                 }
+
+
+                else if (currentool == 17) {
+                    if (contained(mouse, canvas)) {
+                        (mousebitmask & SDL_BUTTON_LMASK)?SDL_ReadSurfacePixel(prespritesurface, (mouse.x-canvas.x)/(canvas.w/resolution.x), (mouse.y-canvas.y)/(canvas.h/resolution.y), &leftcolor.r, &leftcolor.g, &leftcolor.b, &leftcolor.a):SDL_ReadSurfacePixel(prespritesurface, (mouse.x-canvas.x)/(canvas.w/resolution.x), (mouse.y-canvas.y)/(canvas.h/resolution.y), &rightcolor.r, &rightcolor.g, &rightcolor.b, &rightcolor.a);
+                    }
+                }
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         }
 
@@ -972,6 +980,8 @@ int main() {
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
             SDL_RenderClear(renderer);
             SDL_RenderTexture(renderer, sprite[frame], NULL, &spriterect);
+            SDL_SetRenderTarget(renderer, sprite[frame]);
+            prespritesurface = SDL_RenderReadPixels(renderer, NULL);
             SDL_SetRenderTarget(renderer, NULL);
             if (undotextures[frame].size() > unlimit) {
                 std::shift_left(undotextures[frame].begin(), undotextures[frame].end(), 1);
@@ -1063,7 +1073,7 @@ int main() {
                     HSVA.y = limit(1-(mouse.y-colorselectelements[1].y)/colorselectelements[1].h, 0, 1);
                 }
                 else if (contained(lastmouse, colorselectelements[2])) {
-                    HSVA.z = limit((mouse.y-colorselectelements[0].y)/colorselectelements[0].h, 0, 1);
+                    HSVA.z = limit(1-((mouse.y-colorselectelements[0].y)/colorselectelements[0].h), 0, 1);
                 }
                 tempcolor = RGBfHSV(HSVA.w, HSVA.x, HSVA.y);
                 if (leftcolorchanging) leftcolor = (SDL_Color){ tempcolor.r, tempcolor.g, tempcolor.b, (Uint8)(HSVA.z*255) };
@@ -1085,7 +1095,7 @@ int main() {
             SDL_RenderTexture(renderer, colorselectoruitems[0], NULL, &colorselectoruitemsrects[0]);
             colorselectoruitemsrects[3] = (SDL_FRect){ (float)(int)(colorselectorui.x+colorselectorui.w-136+(HSVA.x*90)), (float)(int)(colorselectorui.y+6+((1-HSVA.y)*90)), colorselectoruitemsrects[3].w, colorselectoruitemsrects[3].h };
             SDL_RenderTexture(renderer, colorselectoruitems[1], NULL, &colorselectoruitemsrects[3]);
-            colorselectoruitemsrects[6] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-160, (float)(int)(colorselectorui.y+7+(HSVA.z*90)), colorselectoruitemsrects[0].w, colorselectoruitemsrects[0].h };
+            colorselectoruitemsrects[6] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-160, (float)(int)(colorselectorui.y+7+((1-HSVA.z)*90)), colorselectoruitemsrects[0].w, colorselectoruitemsrects[0].h };
             SDL_RenderTexture(renderer, colorselectoruitems[2], NULL, &colorselectoruitemsrects[6]);
         }
         SDL_RenderTexture(renderer, leftcolorselector, NULL, &leftselectedcolorealrect);
