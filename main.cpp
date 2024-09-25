@@ -1,5 +1,5 @@
+#include "SDL3/SDL_pixels.h"
 #include "SDL3/SDL_render.h"
-#include "SDL3/SDL_surface.h"
 #include <cstdlib>
 #include <iostream>
 #include <cmath>
@@ -360,15 +360,29 @@ int main() {
         }
     }
     SDL_SetRenderDrawColor(renderer, 32, 32, 32, 255);
+    SDL_FRect colorselectrealrect = { colorselectorui.x+colorselectorui.w-158, colorselectorui.y+12, 20, 24 };
     colorselectemprect = (SDL_FRect){ colorselectorui.w-159, 11, 22, colorselectorui.h-22 };
     SDL_RenderFillRect(renderer, &colorselectemprect);
-    for (int y = 0; y < 90; y++) {
-        tempcolor = (SDL_Color){ (Uint8)lerp(255, 43, std::sqrt((double)y/90)), (Uint8)lerp(255, 43, std::sqrt((double)y/90)), (Uint8)lerp(255, 43, std::sqrt((double)y/90)), 255 };
-        SDL_SetRenderDrawColor(renderer, tempcolor.r, tempcolor.g, tempcolor.b, tempcolor.a);
-        for (int x = 0; x < 20; x++) {
-            SDL_RenderPoint(renderer, colorselectorui.w-139-x, 12+y);
-        }
-    }
+    colorselectemprect = (SDL_FRect){ colorselectorui.w-158, 12, 20, colorselectorui.h-24 };
+    SDL_FRect colorselectalpharect = (SDL_FRect){ 0, 0, 20, colorselectorui.h-20 };
+    SDL_Texture * colorselectalpha = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, colorselectalpharect.w, colorselectalpharect.h);
+    SDL_SetRenderTarget(renderer, colorselectalpha);
+    SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer, gridalt.r, gridalt.g, gridalt.b, gridalt.a);
+    for (int y = 0; y < (int)(colorselectemprect.h/8)+2; y++) {
+        grid.y = (y*8)-((int)colorselectemprect.y%8);
+        for (int x = 0; x < (int)(colorselectemprect.w/8); x++) {
+            grid.x = (x*16)-((y%2)*8)-((int)colorselectemprect.x%8);
+            SDL_RenderFillRect(renderer, &grid); }}
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    for (int y = 1; y < 90; y++) {
+        SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, (Uint8)lerp(255, 0, (double)y/90));
+        for (int x = 1; x < 21; x++) {
+            SDL_RenderPoint(renderer, x, y); }}
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    SDL_SetRenderTarget(renderer, colorselector);
+    SDL_RenderTexture(renderer, colorselectalpha, NULL, &colorselectemprect);
     SDL_Texture * colorselectoruitems[] = {
         SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 24, 10),
         SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 12, 12),
@@ -478,18 +492,18 @@ int main() {
     SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
     SDL_RenderClear(renderer);
     SDL_SetRenderDrawColor(renderer, gridalt.r, gridalt.g, gridalt.b, gridalt.a);
-    for (int y = 0; y < (int)(leftselectedcolorect.w/8)+1; y++) {
+    for (int y = 0; y < (int)(leftselectedcolorect.h/8)+1; y++) {
         grid.y = (y*8)-((int)leftselectedcolorealrect.y%8);
-        for (int x = 0; x < (int)(leftselectedcolorect.h/8); x++) {
+        for (int x = 0; x < (int)(leftselectedcolorect.w/8); x++) {
             grid.x = (x*16)-((y%2)*8)-((int)leftselectedcolorealrect.x%8);
             SDL_RenderFillRect(renderer, &grid); }}
     SDL_SetRenderTarget(renderer, rightcolorselector);
     SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
     SDL_RenderClear(renderer);
     SDL_SetRenderDrawColor(renderer, gridalt.r, gridalt.g, gridalt.b, gridalt.a);
-    for (int y = 0; y < (int)(leftselectedcolorect.w/8)+1; y++) {
+    for (int y = 0; y < (int)(leftselectedcolorect.h/8)+1; y++) {
         grid.y = (y*8)-((int)leftselectedcolorealrect.y%8);
-        for (int x = 0; x < (int)(leftselectedcolorect.h/8); x++) {
+        for (int x = 0; x < (int)(leftselectedcolorect.w/8); x++) {
             grid.x = (x*16)-((y%2)*8)-((int)leftselectedcolorealrect.x%8);
             SDL_RenderFillRect(renderer, &grid); }}
     SDL_SetRenderTarget(renderer, NULL);
@@ -620,6 +634,7 @@ int main() {
                     /* Reset UI */
                     cursizerect = (SDL_FRect){(float)limit((cursizerectinborder.x+(cursizerectinborder.w/2)-((canvas.w/resolution.x)/2*(int)cursize)), cursizerectinborder.x, 100), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize), std::nullopt, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*(int)cursize, std::nullopt, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*(int)cursize, std::nullopt, -cursizerectinborder.h) };
                     colorselectorui.y = leftselectedcolorealrect.y+leftselectedcolorealrect.h+12;
+                    colorselectrealrect = { colorselectorui.x+colorselectorui.w-158, colorselectorui.y+12, 20, 24 };
                     colorselectelements[0] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-34, colorselectorui.y+12, colorselectelements[0].w, colorselectelements[0].h };
                     colorselectelements[1] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-132, colorselectorui.y+12, colorselectelements[1].w, colorselectelements[1].h };
                     colorselectelements[2] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-164, colorselectorui.y+12, colorselectelements[2].w, colorselectelements[2].h };
@@ -629,20 +644,39 @@ int main() {
                     SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
                     SDL_RenderClear(renderer);
                     SDL_SetRenderDrawColor(renderer, gridalt.r, gridalt.g, gridalt.b, gridalt.a);
-                    for (int y = 0; y < (int)(leftselectedcolorect.w/8)+1; y++) {
+                    for (int y = 0; y < (int)(leftselectedcolorect.h/8)+1; y++) {
                         grid.y = (y*8)-((int)leftselectedcolorealrect.y%8);
-                        for (int x = 0; x < (int)(leftselectedcolorect.h/8); x++) {
+                        for (int x = 0; x < (int)(leftselectedcolorect.w/8); x++) {
                             grid.x = (x*16)-((y%2)*8)-((int)leftselectedcolorealrect.x%8);
                             SDL_RenderFillRect(renderer, &grid); }}
                     SDL_SetRenderTarget(renderer, rightcolorselector);
                     SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
                     SDL_RenderClear(renderer);
                     SDL_SetRenderDrawColor(renderer, gridalt.r, gridalt.g, gridalt.b, gridalt.a);
-                    for (int y = 0; y < (int)(leftselectedcolorect.w/8)+1; y++) {
+                    for (int y = 0; y < (int)(leftselectedcolorect.h/8)+1; y++) {
                         grid.y = (y*8)-((int)leftselectedcolorealrect.y%8);
-                        for (int x = 0; x < (int)(leftselectedcolorect.h/8); x++) {
+                        for (int x = 0; x < (int)(leftselectedcolorect.w/8); x++) {
                             grid.x = (x*16)-((y%2)*8)-((int)leftselectedcolorealrect.x%8);
                             SDL_RenderFillRect(renderer, &grid); }}
+                    colorselectemprect = (SDL_FRect){ colorselectorui.w-158, 12, 20, colorselectorui.h-24 };
+                    colorselectalpharect = (SDL_FRect){ 0, 0, 20, colorselectorui.h-20 };
+                    SDL_SetRenderTarget(renderer, colorselectalpha);
+                    SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
+                    SDL_RenderClear(renderer);
+                    SDL_SetRenderDrawColor(renderer, gridalt.r, gridalt.g, gridalt.b, gridalt.a);
+                    for (int y = 0; y < (int)(colorselectemprect.h/8)+2; y++) {
+                        grid.y = (y*8)-((int)colorselectrealrect.y%8);
+                        for (int x = 0; x < (int)(colorselectemprect.w/8); x++) {
+                            grid.x = (x*16)-((y%2)*8)-((int)colorselectrealrect.x%8);
+                            SDL_RenderFillRect(renderer, &grid); }}
+                    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+                    for (int y = 1; y < 90; y++) {
+                        SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, (Uint8)lerp(255, 0, (double)y/90));
+                        for (int x = 1; x < 21; x++) {
+                            SDL_RenderPoint(renderer, x, y); }}
+                    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+                    SDL_SetRenderTarget(renderer, colorselector);
+                    SDL_RenderTexture(renderer, colorselectalpha, NULL, &colorselectemprect);
                     SDL_SetRenderTarget(renderer, NULL);
                     break;
 
