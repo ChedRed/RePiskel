@@ -1,6 +1,3 @@
-#include "SDL3/SDL_blendmode.h"
-#include "SDL3/SDL_render.h"
-#include "SDL3/SDL_video.h"
 #include <cstdlib>
 #include <iostream>
 #include <cmath>
