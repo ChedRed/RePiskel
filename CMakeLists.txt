@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.29.6)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(CMAKE_OSX_SYSROOT macosx)
 endif()
-project(RePiskel)
+project(repiskel)
 
 
 # Set CMake variables
@@ -14,10 +14,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 # Main executable
+add_executable(repiskel WIN32 main.cpp)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    add_executable(repiskel WIN32 main.cpp)
-else()
-    add_executable(repiskel main.cpp)
+    # set_target_properties(repiskel PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()
 
 
@@ -51,22 +50,24 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     configure_file(${CMAKE_SOURCE_DIR}/../Cached/libSDL3_ttf.0.0.0.dylib ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/contents/Resources/libSDL3_ttf.0.dylib COPYONLY)
     # configure_file(${CMAKE_SOURCE_DIR}/../Cached/libgtk-4.1.dylib ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/contents/Resources/libgtk-4.1.dylib COPYONLY)
 
+
 else(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     # Set windows result path
     set_target_properties(repiskel PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/nogit/RePiskel")
 
 
     # Link libraries and include directories
-    target_link_libraries(repiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/SDL3.dll)
-    target_link_libraries(repiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/SDL3_ttf.dll)
-    # target_include_directories(mediacall PRIVATE C:/usr/local/include "C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/cppwinrt")
+    target_link_libraries(repiskel PRIVATE C:/usr/local/lib/SDL3.lib)
+    target_link_libraries(repiskel PRIVATE C:/usr/local/lib/SDL3_ttf.lib)
+    target_include_directories(repiskel PRIVATE C:/usr/local/include) # "C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/cppwinrt"
 
 
     # Add basic files to windows app
-    # file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/info.plist DESTINATION "${CMAKE_SOURCE_DIR}/nogit/Media Call.app/Contents")
+    file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/tools.bmp DESTINATION ${CMAKE_SOURCE_DIR}/nogit/RePiskel)
+    file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/FreeSans.ttf DESTINATION ${CMAKE_SOURCE_DIR}/nogit/RePiskel)
 
 
     # Add resources to windows app
-    file(COPY ${CMAKE_SOURCE_DIR}/../Cached/SDL3.dll DESTINATION "${CMAKE_SOURCE_DIR}/nogit/RePiskel")
-    file(COPY ${CMAKE_SOURCE_DIR}/../Cached/SDL3_ttf.dll DESTINATION "${CMAKE_SOURCE_DIR}/nogit/RePiskel")
+    file(COPY C:/usr/local/lib/SDL3.dll DESTINATION "${CMAKE_SOURCE_DIR}/nogit/RePiskel")
+    file(COPY C:/usr/local/lib/SDL3_ttf.dll DESTINATION "${CMAKE_SOURCE_DIR}/nogit/RePiskel")
 endif()

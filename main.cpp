@@ -1,12 +1,35 @@
 #include <cstdlib>
 #include <iostream>
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <string>
 #include <vector>
 #include <algorithm>
 #include <optional>
+#if defined(_WIN32)
+    #include <Windows.h>
+#endif
+#define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 #include <SDL3_ttf/SDL_ttf.h>
+
+
+#define elif else if
+
+
+/*
+Get os
+    0: ¯\_(ツ)_/¯
+    1: Windows
+    2: MacOS
+    3: Linux
+*/
+int os = 0;
+
+
+/* OS-dependent stuff */
+std::string rpath;
 
 
 /* SDL setup variables */
@@ -193,9 +216,9 @@ bool inlimit(double value, std::optional<double> min = std::nullopt, std::option
 bool contained(fvec2 point, SDL_FRect container) { return ((container.w>0)?point.x>container.x:point.x<container.x) && ((container.h>0)?point.y>container.y:point.y<container.y) && ((container.w>0)?point.x<container.x+container.w:point.x>container.x+container.w) && ((container.h>0)?point.y<container.y+container.h:point.y>container.y+container.h); }
 
 
-/* Max/Min functions */
-double max(double a, double b) { return (a>b)?a:b; }
-double min(double a, double b) { return (a<b)?a:b; }
+// /* Max/Min functions */
+// double max(double a, double b) { return (a>b)?a:b; }
+// double min(double a, double b) { return (a<b)?a:b; }
 
 
 /* Secondary line function for dithering */
@@ -271,8 +294,8 @@ SDL_Color RGBfHSV(double h, double s, double v) {
 fvec3 HSVfRGB(int r, int g, int b) {
     fvec3 rehsv = (fvec3){ (float)r/255, (float)g/255, (float)b/255 };
     fvec3 realhsv;
-    float cmax = std::max(rehsv.x, std::max(rehsv.y, rehsv.z));
-    float cmin = std::min(rehsv.x, std::min(rehsv.y, rehsv.z));
+    float cmax = max(rehsv.x, max(rehsv.y, rehsv.z));
+    float cmin = min(rehsv.x, min(rehsv.y, rehsv.z));
     float delta = cmax-cmin;
     realhsv.x = ((cmax==cmin)?0:fmod(((cmax==rehsv.x)?(60*((rehsv.y-rehsv.z)/delta)+360):((cmax==rehsv.y)?(60*((rehsv.z-rehsv.x)/delta)+120):(60*((rehsv.x-rehsv.y)/delta)+240))), 360));
     realhsv.y = (cmax==0)?0:(delta/cmax);
@@ -282,7 +305,21 @@ fvec3 HSVfRGB(int r, int g, int b) {
 
 
 /* Main! */
-int main() {
+int main(int argc, char* argv[]) {
+    /* Set os variable */
+    #ifdef _WIN32
+    os = 1;
+    #elifdef __APPLE__
+    os = 2;
+    #elifdef __linux__
+    os = 3;
+    #endif
+
+
+    if (os == 1) rpath = "./";
+    elif (os == 2) rpath = "../Resources/";
+
+
     undotextures.resize(1);
     /* Initialize SDL, create window and renderer */
     std::cout << "Initializing SDL3" << std::endl;
@@ -298,12 +335,12 @@ int main() {
     /* Initialize SDL_ttf, create font object */
     TTF_Init();
     char tempath[256];
-    snprintf(tempath, sizeof(tempath), "%s%s", SDL_GetBasePath(), "../Resources/FreeSans.ttf");
+    snprintf(tempath, sizeof(tempath), "%s%s%s", SDL_GetBasePath(), rpath.c_str(), "FreeSans.ttf");
     TTF_Font * font = TTF_OpenFont(tempath, 24);
 
 
     /* Create title text */
-    SDL_Surface * pretitle = TTF_RenderText_Blended(font, "New Piskel", (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
+    SDL_Surface * pretitle = TTF_RenderText_Blended(font, "New Piskel", 10, (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
     SDL_Texture * title = SDL_CreateTextureFromSurface(renderer, pretitle);
     SDL_GetTextureSize(title, &tirect.w, &tirect.h);
     tirect.x = ((float)windowsize.x/2)-((float)tirect.w/2);
@@ -313,7 +350,7 @@ int main() {
 
     /* Load textures */
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-    snprintf(tempath, sizeof(tempath), "%s%s", SDL_GetBasePath(), "../Resources/tools.bmp");
+    snprintf(tempath, sizeof(tempath), "%s%s%s", SDL_GetBasePath(), rpath.c_str(), "tools.bmp");
     SDL_Surface * pretools = SDL_LoadBMP(tempath);
     SDL_Texture * tools = SDL_CreateTextureFromSurface(renderer, pretools);
     SDL_GetTextureSize(tools, &toolsrect.w, &toolsrect.h);
@@ -444,7 +481,7 @@ int main() {
     SDL_SetTextureScaleMode(rightcolorselector, SDL_SCALEMODE_NEAREST);
     SDL_GetTextureSize(presprite, &spriterect.w, &spriterect.h);
     spriterect = (SDL_FRect){0, 0, spriterect.w, spriterect.h };
-    SDL_Surface * tempcursizetextrect = TTF_RenderText_Blended(font, "1x", (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
+    SDL_Surface * tempcursizetextrect = TTF_RenderText_Blended(font, "1x", 2, (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
     SDL_Texture * cursizetextrecture = SDL_CreateTextureFromSurface(renderer, tempcursizetextrect);
     SDL_DestroySurface(tempcursizetextrect);
     SDL_GetTextureSize(cursizetextrecture, &cursizetextrect.w, &cursizetextrect.h);
@@ -719,7 +756,7 @@ int main() {
                             SDL_DestroyTexture(cursizetextrecture);
                             char tempchar[256];
                             snprintf(tempchar, sizeof(tempchar), "%d%s", (int)limit(cursize+(scroll.y/10), 1, max(resolution.x, resolution.y)), "x");
-                            tempcursizetextrect = TTF_RenderText_Blended(font, tempchar, (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
+                            tempcursizetextrect = TTF_RenderText_Blended(font, tempchar, strlen(tempchar), (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
                             cursizetextrecture = SDL_CreateTextureFromSurface(renderer, tempcursizetextrect);
                             SDL_DestroySurface(tempcursizetextrect);
                             SDL_GetTextureSize(cursizetextrecture, &cursizetextrect.w, &cursizetextrect.h);
@@ -1175,3 +1212,9 @@ int main() {
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0; }
+
+
+/* Windows window subsystem :( */
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
+    return main(__argc, __argv);
+}
