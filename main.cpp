@@ -294,8 +294,8 @@ SDL_Color RGBfHSV(double h, double s, double v) {
 fvec3 HSVfRGB(int r, int g, int b) {
     fvec3 rehsv = (fvec3){ (float)r/255, (float)g/255, (float)b/255 };
     fvec3 realhsv;
-    float cmax = max(rehsv.x, max(rehsv.y, rehsv.z));
-    float cmin = min(rehsv.x, min(rehsv.y, rehsv.z));
+    float cmax = std::max(rehsv.x, std::max(rehsv.y, rehsv.z));
+    float cmin = std::min(rehsv.x, std::min(rehsv.y, rehsv.z));
     float delta = cmax-cmin;
     realhsv.x = ((cmax==cmin)?0:fmod(((cmax==rehsv.x)?(60*((rehsv.y-rehsv.z)/delta)+360):((cmax==rehsv.y)?(60*((rehsv.z-rehsv.x)/delta)+120):(60*((rehsv.x-rehsv.y)/delta)+240))), 360));
     realhsv.y = (cmax==0)?0:(delta/cmax);
@@ -752,10 +752,10 @@ int main(int argc, char* argv[]) {
 
                     /* Reset pen size */
                     else{
-                        if ((int)cursize!=(int)limit(cursize+(scroll.y/10), 1, max(resolution.x, resolution.y))){
+                        if ((int)cursize!=(int)limit(cursize+(scroll.y/10), 1, std::max(resolution.x, resolution.y))){
                             SDL_DestroyTexture(cursizetextrecture);
                             char tempchar[256];
-                            snprintf(tempchar, sizeof(tempchar), "%d%s", (int)limit(cursize+(scroll.y/10), 1, max(resolution.x, resolution.y)), "x");
+                            snprintf(tempchar, sizeof(tempchar), "%d%s", (int)limit(cursize+(scroll.y/10), 1, std::max(resolution.x, resolution.y)), "x");
                             tempcursizetextrect = TTF_RenderText_Blended(font, tempchar, strlen(tempchar), (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
                             cursizetextrecture = SDL_CreateTextureFromSurface(renderer, tempcursizetextrect);
                             SDL_DestroySurface(tempcursizetextrect);
@@ -763,7 +763,7 @@ int main(int argc, char* argv[]) {
                             SDL_DestroySurface(tempcursizetextrect);
                             remove(tempchar);
                         }
-                        cursize=limit(cursize+(scroll.y/10), 1, max(resolution.x, resolution.y));
+                        cursize=limit(cursize+(scroll.y/10), 1, std::max(resolution.x, resolution.y));
 
 
                         /* Reset pen size text */
@@ -1214,7 +1214,9 @@ int main(int argc, char* argv[]) {
     return 0; }
 
 
+#if os==1
 /* Windows window subsystem :( */
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
     return main(__argc, __argv);
 }
+#endif
