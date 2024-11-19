@@ -4,17 +4,19 @@
 #include <cmath>
 #include <string>
 #include <vector>
-#include <algorithm>
 #include <optional>
-#if defined(_WIN32)
-    #include <Windows.h>
+#ifdef _WIN32
+#include <Windows.h>
 #endif
+#include <algorithm>
 #define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
 
+#undef min
+#undef max
 #define elif else if
 
 
@@ -1214,7 +1216,7 @@ int main(int argc, char* argv[]) {
     return 0; }
 
 
-#if os==1
+#ifdef _WIN32
 /* Windows window subsystem :( */
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
     return main(__argc, __argv);
