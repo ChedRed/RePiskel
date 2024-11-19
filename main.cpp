@@ -18,6 +18,12 @@
 #undef min
 #undef max
 #define elif else if
+#ifdef _WIN32
+#define SDL_MODKEY SDL_SCANCODE_LCTRL
+#elifdef __APPLE__
+#define SDL_MODKEY SDL_SCANCODE_LGUI
+#endif
+
 
 
 /*
@@ -848,7 +854,7 @@ int main(int argc, char* argv[]) {
 
 
                     /* Undo/Redo */
-                    if (keystates[SDL_SCANCODE_LGUI]) {
+                    if (keystates[SDL_MODKEY]) {
                         if (e.key.key == SDLK_Z) {
                             if (keystates[SDL_SCANCODE_LSHIFT]){
                                 if (undupdateorder > 1) {

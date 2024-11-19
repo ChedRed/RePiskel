@@ -3,7 +3,8 @@ cmake_minimum_required(VERSION 3.29.6)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(CMAKE_OSX_SYSROOT macosx)
 endif()
-project(repiskel)
+project(RePiskel)
+
 
 
 # Set CMake variables
@@ -14,23 +15,25 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 # Main executable
-add_executable(repiskel WIN32 main.cpp)
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    # set_target_properties(repiskel PROPERTIES WIN32_EXECUTABLE TRUE)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    add_executable(RePiskel WIN32 main.cpp)
+else(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    add_executable(RePiskel WIN32 main.cpp buildfiles/wicon.rc)
 endif()
 
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     # Set macos executable rpath and result path
-    set_target_properties(repiskel PROPERTIES INSTALL_RPATH "@executable_path/../Resources" BUILD_WITH_INSTALL_RPATH TRUE)
-    set_target_properties(repiskel PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/Contents/MacOS)
+    set_target_properties(RePiskel PROPERTIES INSTALL_RPATH "@executable_path/../Resources" BUILD_WITH_INSTALL_RPATH TRUE)
+    set_target_properties(RePiskel PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/Contents/MacOS)
 
 
     # Link libraries and include directories
-    target_link_libraries(repiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/libSDL3.0.dylib)
-    target_link_libraries(repiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/libSDL3_ttf.0.0.0.dylib)
-    # target_link_libraries(repiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/libgtk-4.1.dylib)
-    target_include_directories(repiskel PRIVATE /usr/local/include)
+    target_link_libraries(RePiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/libSDL3.0.dylib)
+    target_link_libraries(RePiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/libSDL3_ttf.0.0.0.dylib)
+    # target_link_libraries(RePiskel PRIVATE ${CMAKE_SOURCE_DIR}/../Cached/libgtk-4.1.dylib)
+    target_include_directories(RePiskel PRIVATE /usr/local/include)
 
 
     # Make directories for macos app
@@ -53,13 +56,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 
 else(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     # Set windows result path
-    set_target_properties(repiskel PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/nogit/RePiskel")
+    set_target_properties(RePiskel PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/nogit/RePiskel")
 
 
     # Link libraries and include directories
-    target_link_libraries(repiskel PRIVATE C:/usr/local/lib/SDL3.lib)
-    target_link_libraries(repiskel PRIVATE C:/usr/local/lib/SDL3_ttf.lib)
-    target_include_directories(repiskel PRIVATE C:/usr/local/include) # "C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/cppwinrt"
+    target_link_libraries(RePiskel PRIVATE C:/usr/local/lib/SDL3.lib)
+    target_link_libraries(RePiskel PRIVATE C:/usr/local/lib/SDL3_ttf.lib)
+    target_include_directories(RePiskel PRIVATE C:/usr/local/include) # "C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/cppwinrt"
 
 
     # Add basic files to windows app
