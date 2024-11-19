@@ -17,7 +17,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Main executable
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    add_executable(RePiskel WIN32 main.cpp)
+    add_executable(RePiskel MACOSX_BUNDLE main.cpp buildfiles/icon.icns)
 else(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     add_executable(RePiskel WIN32 main.cpp buildfiles/wicon.rc)
 endif()
@@ -26,7 +26,7 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     # Set macos executable rpath and result path
     set_target_properties(RePiskel PROPERTIES INSTALL_RPATH "@executable_path/../Resources" BUILD_WITH_INSTALL_RPATH TRUE)
-    set_target_properties(RePiskel PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/nogit/RePiskel.app/Contents/MacOS)
+    set_target_properties(RePiskel PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/nogit)
 
 
     # Link libraries and include directories
