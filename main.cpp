@@ -25,7 +25,6 @@
 #endif
 
 
-
 /*
 Get os
     0: ¯\_(ツ)_/¯
@@ -47,7 +46,6 @@ bool focus = true;
 
 
 /* New 'data types' */
-struct deltadata { double fps; double now; double then; double deltime; };
 struct vec2 { int x; int y; };
 struct fvec2 { float x; float y; };
 struct fvec3 { float x; float y; float z; };
@@ -60,7 +58,8 @@ struct duo { float a; float b; };
 
 
 /* Display setup variables */
-deltadata dtdata;
+float deltime;
+float then;
 vec2 windowsize = { 1000, 650 };
 SDL_Color gridmain = { .r=85, .g=85, .b=85, .a=255 };
 SDL_Color gridalt = { .r=76, .g=76, .b=76, .a=255 };
@@ -222,11 +221,6 @@ bool inlimit(double value, std::optional<double> min = std::nullopt, std::option
 
 /* Contained function */
 bool contained(fvec2 point, SDL_FRect container) { return ((container.w>0)?point.x>container.x:point.x<container.x) && ((container.h>0)?point.y>container.y:point.y<container.y) && ((container.w>0)?point.x<container.x+container.w:point.x>container.x+container.w) && ((container.h>0)?point.y<container.y+container.h:point.y>container.y+container.h); }
-
-
-// /* Max/Min functions */
-// double max(double a, double b) { return (a>b)?a:b; }
-// double min(double a, double b) { return (a<b)?a:b; }
 
 
 /* Secondary line function for dithering */
@@ -561,10 +555,8 @@ int main(int argc, char* argv[]) {
 
 
         /* Get mouse pos and get FPS */
-        dtdata.then = dtdata.now;
-        dtdata.now = SDL_GetPerformanceCounter();
-        dtdata.deltime = (dtdata.now - dtdata.then) / (double)SDL_GetPerformanceFrequency();
-        dtdata.fps = (1/dtdata.deltime);
+        deltime = (SDL_GetPerformanceCounter() - then) / (double)SDL_GetPerformanceFrequency();
+        then = SDL_GetPerformanceCounter();
 
 
         /* Clear renderer and draw background grid */
@@ -1210,7 +1202,6 @@ int main(int argc, char* argv[]) {
 
         /* Wait if unfocussed */
         if (!focus) SDL_Delay((Uint32)250);
-        SDL_Delay((Uint32)5);
     }
 
 
