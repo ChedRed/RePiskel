@@ -1,3 +1,5 @@
+#include "SDL3/SDL_video.h"
+#include <oaidl.h>
 #define _USE_MATH_DEFINES
 #include "TextHelp.hpp"
 #include "Vector2.hpp"
@@ -100,8 +102,8 @@ SDL_Color rightcolor = (SDL_Color){ .r=0, .g=0, .b=0, .a=0 };
 
 /* Custom SDL3 items */
 SDL_BlendMode straightbrighten = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_REV_SUBTRACT);
+SDL_BlendMode reverstraightbrighten = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_SRC_COLOR, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD);
 SDL_BlendMode straightdarken = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_REV_SUBTRACT, SDL_BLENDFACTOR_ZERO, SDL_BLENDFACTOR_ONE, SDL_BLENDOPERATION_REV_SUBTRACT);
-SDL_BlendMode reverstraightbrighten = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDOPERATION_ADD, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ZERO, SDL_BLENDOPERATION_REV_SUBTRACT);
 SDL_BlendMode reverstraightdarken = SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_SRC_ALPHA, SDL_BLENDOPERATION_REV_SUBTRACT, SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ZERO, SDL_BLENDOPERATION_REV_SUBTRACT);
 
 
@@ -125,7 +127,6 @@ SDL_FRect cursizerectinborder;
 SDL_FRect cursizerectborder;
 SDL_FRect cursizerect;
 int cursize = 1;
-// SDL_FRect cursizetextrect;
 SDL_FRect leftselectedcolorect = { 0, 0, 36, 36 };
 SDL_FRect rightselectedcolorect = { 0, 0, 36, 36 };
 SDL_FRect leftselectedcolorealrect = { 0, 0, leftselectedcolorect.w-8, leftselectedcolorect.h-8 };
@@ -239,9 +240,9 @@ void ditherline(SDL_Renderer * renderer, SDL_Color cola, SDL_Color colb, vec2 st
 
 
 /* Tertiary line function for lighten */
-void lightenline(SDL_Renderer * renderer, vec2 start, vec2 end, bool darken, bool add) {
+void lightenline(SDL_Renderer * renderer, vec2 start, vec2 end, bool darken, bool add) { // Fix brightening invisible pixels (preferably with GetSurfacePixel)
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 16);
-    if (add) ((darken)?SDL_SetRenderDrawBlendMode(renderer, straightdarken):SDL_SetRenderDrawBlendMode(renderer, straightbrighten));
+    if (add) ((darken)?SDL_SetRenderDrawBlendMode(renderer, straightdarken):SDL_SetRenderDrawBlendMode(renderer, reverstraightbrighten));
     else SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     vec2 distance = { abs(end.x-start.x), abs(end.y-start.y) };
     vec2 mirror = { (start.x<end.x)?1:-1, (start.y<end.y) ?1:-1 };
@@ -466,7 +467,7 @@ int main(int argc, char* argv[]) {
     SDL_SetTextureScaleMode(rightcolorselector, SDL_SCALEMODE_NEAREST);
     SDL_GetTextureSize(presprite, &spriterect.w, &spriterect.h);
     spriterect = (SDL_FRect){0, 0, spriterect.w, spriterect.h };
-    CurSizeText.Position = Vector2(cursizerectborder.x+(cursizerectborder.w/2), cursizerectborder.y+cursizerectborder.h-10);
+    CurSizeText.Position = Vector2(cursizerectborder.x+(cursizerectborder.w/2), cursizerectborder.y+cursizerectborder.h-(Characters.GetMaxHeight(CurSizeText.Text)/2));
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
 
@@ -648,14 +649,14 @@ int main(int argc, char* argv[]) {
 
 
                     /* Reset UI */
-                    cursizerect = (SDL_FRect){(float)limit((cursizerectinborder.x+(cursizerectinborder.w/2)-((canvas.w/resolution.x)/2*cursize)), cursizerectinborder.x, 100), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*cursize), std::nullopt, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*cursize, std::nullopt, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*cursize, std::nullopt, -cursizerectinborder.h) };
+                    cursizerect = {(float)limit((cursizerectinborder.x+(cursizerectinborder.w/2)-((canvas.w/resolution.x)/2*cursize)), cursizerectinborder.x, 100), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*cursize), std::nullopt, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*cursize, std::nullopt, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*cursize, std::nullopt, -cursizerectinborder.h) };
                     colorselectorui.y = leftselectedcolorealrect.y+leftselectedcolorealrect.h+12;
                     colorselectrealrect = { colorselectorui.x+colorselectorui.w-158, colorselectorui.y+12, 20, 24 };
-                    colorselectelements[0] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-34, colorselectorui.y+12, colorselectelements[0].w, colorselectelements[0].h };
-                    colorselectelements[1] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-132, colorselectorui.y+12, colorselectelements[1].w, colorselectelements[1].h };
-                    colorselectelements[2] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-164, colorselectorui.y+12, colorselectelements[2].w, colorselectelements[2].h };
-                    leftselectedcolorect = (SDL_FRect){8, toolsrect.y+toolsrect.h+8, leftselectedcolorect.w, leftselectedcolorect.h };
-                    rightselectedcolorect = (SDL_FRect){toolsrect.w-rightselectedcolorect.w+8, toolsrect.y+toolsrect.h+8, rightselectedcolorect.w, rightselectedcolorect.h };
+                    colorselectelements[0] = { colorselectorui.x+colorselectorui.w-34, colorselectorui.y+12, colorselectelements[0].w, colorselectelements[0].h };
+                    colorselectelements[1] = { colorselectorui.x+colorselectorui.w-132, colorselectorui.y+12, colorselectelements[1].w, colorselectelements[1].h };
+                    colorselectelements[2] = { colorselectorui.x+colorselectorui.w-164, colorselectorui.y+12, colorselectelements[2].w, colorselectelements[2].h };
+                    leftselectedcolorect = {8, toolsrect.y+toolsrect.h+8, leftselectedcolorect.w, leftselectedcolorect.h };
+                    rightselectedcolorect = {toolsrect.w-rightselectedcolorect.w+8, toolsrect.y+toolsrect.h+8, rightselectedcolorect.w, rightselectedcolorect.h };
                     SDL_SetRenderTarget(renderer, leftcolorselector);
                     SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
                     SDL_RenderClear(renderer);
@@ -973,7 +974,7 @@ int main(int argc, char* argv[]) {
                         }
                         for (int y = 0; y < cursize; y++) {
                             for (int x = 0; x < cursize; x++) {
-                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), false);
+                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), true);
                             }
                         }
                         SDL_SetRenderTarget(renderer, NULL);
@@ -991,7 +992,7 @@ int main(int argc, char* argv[]) {
                         }
                         for (int y = 0; y < cursize; y++) {
                             for (int x = 0; x < cursize; x++) {
-                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), true);
+                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), false);
                             }
                         }
                         SDL_SetRenderTarget(renderer, NULL);
@@ -999,9 +1000,22 @@ int main(int argc, char* argv[]) {
                 }
 
 
+                /* Pick color */
                 else if (currentool == 17) {
                     if (contained(mouse, canvas)) {
                         (mousebitmask & SDL_BUTTON_LMASK)?SDL_ReadSurfacePixel(prespritesurface, (mouse.x-canvas.x)/(canvas.w/resolution.x), (mouse.y-canvas.y)/(canvas.h/resolution.y), &leftcolor.r, &leftcolor.g, &leftcolor.b, &leftcolor.a):SDL_ReadSurfacePixel(prespritesurface, (mouse.x-canvas.x)/(canvas.w/resolution.x), (mouse.y-canvas.y)/(canvas.h/resolution.y), &rightcolor.r, &rightcolor.g, &rightcolor.b, &rightcolor.a);
+                        leftcoloralphapreview[0].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255 };
+                        leftcoloralphapreview[1].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255 };
+                        leftcoloralphapreview[2].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255 };
+                        leftcolorpreview[0].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, 1 };
+                        leftcolorpreview[1].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, 1 };
+                        leftcolorpreview[2].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, 1 };
+                        rightcoloralphapreview[0].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, (float)rightcolor.a/255 };
+                        rightcoloralphapreview[1].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, (float)rightcolor.a/255 };
+                        rightcoloralphapreview[2].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, (float)rightcolor.a/255 };
+                        rightcolorpreview[0].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1 };
+                        rightcolorpreview[1].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1 };
+                        rightcolorpreview[2].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1 };
                     }
                 }
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -1165,7 +1179,7 @@ int main(int argc, char* argv[]) {
 
 
         /* Wait if unfocussed */
-        if (!focus) SDL_Delay((Uint32)250);
+        if (!focus) SDL_Delay(250);
     }
 
 
