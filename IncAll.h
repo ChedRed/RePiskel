@@ -1,7 +1,6 @@
 #pragma once
 #include <cstdlib>
 #include <iostream>
-#define _USE_MATH_DEFINES
 #include <cmath>
 #include <string>
 #include <vector>

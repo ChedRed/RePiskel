@@ -1,5 +1,4 @@
 #pragma once
-#include "IncAll.h"
 #include "SDL3/SDL_render.h"
 #include "Vector2.hpp"
 #include <string>
@@ -14,10 +13,11 @@ typedef int Alignment;
 // Character cache
 class TextCharacters{
 public:
-TextCharacters(SDL_Renderer * renderer = nullptr, TTF_Font * font = nullptr, std::string characters = "");
+TextCharacters(SDL_Renderer * renderer, TTF_Font * font, std::string characters);
 SDL_Renderer * GetRenderer();
 SDL_Texture * GetCharacter(std::string character);
 float GetTotalLength(std::string characters);
+float GetMaxHeight(std::string characters);
 private:
 TTF_Font * Font;
 std::string Charin;
@@ -50,9 +50,20 @@ inline float TextCharacters::GetTotalLength(std::string characters){
     float addvalue = 0;
     for (int i = 0; i < characters.length(); i++){
         SDL_GetTextureSize(Characters[Charin.find(characters[i])], &addvalue, nullptr);
+        value += addvalue;
     }
-    value += addvalue;
     return value;
+}
+
+
+inline float TextCharacters::GetMaxHeight(std::string characters){
+    float value = 0;
+    float highest = 0;
+    for (int i = 0; i < characters.length(); i++){
+        SDL_GetTextureSize(Characters[Charin.find(characters[i])], nullptr, &value);
+        highest = (value>highest)?value:highest;
+    }
+    return highest;
 }
 
 
@@ -81,17 +92,15 @@ inline TextObject::TextObject(const char * text, Alignment align, Vector2 positi
 
 
 inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Characters){
-    float offset = Position.x;
-    SDL_FRect charect = {Position.x, Position.y, 0, 0};
+    SDL_FRect charect = {Position.x, Position.y - (Characters.GetMaxHeight(Text)/2), 0, 0};
     SDL_Texture * curchar;
     if (Align != Left){
-        offset -= Characters.GetTotalLength(Text) * ((float)(Align+1)/2);
+        charect.x -= Characters.GetTotalLength(Text) * (((float)(Align+1))/2);
     }
     for (int i = 0; i < Text.length(); i++){
         curchar = Characters.GetCharacter(std::string() + Text[i]);
         SDL_GetTextureSize(curchar, &charect.w, &charect.h);
-        charect.x = offset;
-        offset += charect.w;
         SDL_RenderTexture(renderer, curchar, NULL, &charect);
+        charect.x += charect.w;
     }
 }

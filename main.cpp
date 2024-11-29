@@ -1,4 +1,4 @@
-#include "IncAll.h"
+#define _USE_MATH_DEFINES
 #include "TextHelp.hpp"
 #include "Vector2.hpp"
 
@@ -35,7 +35,6 @@ bool focus = true;
 
 /* New 'data types' */
 struct vec2 { int x; int y; };
-struct fvec2 { float x; float y; };
 struct fvec3 { float x; float y; float z; };
 struct fvec4 { float w; float x; float y; float z; };
 struct duo { float a; float b; };
@@ -55,11 +54,11 @@ SDL_FRect grid = { 0, 0, 8, 8 };
 
 
 /* Input setup variables */
-fvec2 mouse = { 0, 0 };
-fvec2 scroll = { 0, 0 };
+Vector2 mouse = { 0, 0 };
+Vector2 scroll = { 0, 0 };
 bool mousedowned = false;
-fvec2 lastmouse = { 0, 0 };
-fvec2 framelastmouse = { 0, 0 };
+Vector2 lastmouse = { 0, 0 };
+Vector2 framelastmouse = { 0, 0 };
 Uint32 mousebitmask;
 const bool * keystates = SDL_GetKeyboardState(NULL);
 bool oldshift = false;
@@ -72,13 +71,13 @@ SDL_FRect nameborder = { 0, 0, (float)windowsize.x, 36 };
 
 
 /* Canvas */
-fvec2 resolution = { 16, 16 };
-fvec2 drawresolution = { 0, 0 };
-fvec2 resratio = { (resolution.x<resolution.y)?(float)resolution.x/resolution.y:1, (resolution.x>resolution.y)?(float)resolution.y/resolution.x:1 };
-fvec2 canvascenter = { (margin.a/2)+((windowsize.x-margin.b)/2), (22)+(((float)windowsize.y-8)/2) };
+Vector2 resolution = { 16, 16 };
+Vector2 drawresolution = { 0, 0 };
+Vector2 resratio = Vector2((resolution.x<resolution.y)?(float)resolution.x/resolution.y:1, (resolution.x>resolution.y)?(float)resolution.y/resolution.x:1);
+Vector2 canvascenter = Vector2((margin.a/2)+((windowsize.x-margin.b)/2), (22)+(((float)windowsize.y-8)/2));
 SDL_FRect precanvas = { margin.a, 44, windowsize.x-margin.a-margin.b, (float)windowsize.y-52 };
-fvec2 canvasize = { resratio.x*((resolution.x<resolution.y)?precanvas.h:precanvas.w), resratio.y*((resolution.x>resolution.y)?precanvas.h:precanvas.w) };
-fvec2 oldcanvasize = canvasize;
+Vector2 canvasize = Vector2(resratio.x*((resolution.x<resolution.y)?precanvas.h:precanvas.w), resratio.y*((resolution.x>resolution.y)?precanvas.h:precanvas.w));
+Vector2 oldcanvasize = canvasize;
 SDL_FRect canvas = { canvascenter.x-(canvasize.x/2), canvascenter.y-(canvasize.y/2), canvasize.x, canvasize.y };
 SDL_Texture * presprite;
 SDL_Surface * prespritesurface;
@@ -125,8 +124,8 @@ std::string toolnames[18] = {"Pen", "Line", "Eraser", "Mirror", "Dither", "Light
 SDL_FRect cursizerectinborder;
 SDL_FRect cursizerectborder;
 SDL_FRect cursizerect;
-float cursize = 1;
-SDL_FRect cursizetextrect;
+int cursize = 1;
+// SDL_FRect cursizetextrect;
 SDL_FRect leftselectedcolorect = { 0, 0, 36, 36 };
 SDL_FRect rightselectedcolorect = { 0, 0, 36, 36 };
 SDL_FRect leftselectedcolorealrect = { 0, 0, leftselectedcolorect.w-8, leftselectedcolorect.h-8 };
@@ -207,7 +206,7 @@ bool inlimit(double value, std::optional<double> min = std::nullopt, std::option
 
 
 /* Contained function */
-bool contained(fvec2 point, SDL_FRect container) { return ((container.w>0)?point.x>container.x:point.x<container.x) && ((container.h>0)?point.y>container.y:point.y<container.y) && ((container.w>0)?point.x<container.x+container.w:point.x>container.x+container.w) && ((container.h>0)?point.y<container.y+container.h:point.y>container.y+container.h); }
+bool contained(Vector2 point, SDL_FRect container) { return ((container.w>0)?point.x>container.x:point.x<container.x) && ((container.h>0)?point.y>container.y:point.y<container.y) && ((container.w>0)?point.x<container.x+container.w:point.x>container.x+container.w) && ((container.h>0)?point.y<container.y+container.h:point.y>container.y+container.h); }
 
 
 /* Secondary line function for dithering */
@@ -327,11 +326,12 @@ int main(int argc, char* argv[]) {
 
 
     /* Init text assistant :) */
-    TextCharacters Characters = {renderer, font, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890,.~!@#$%^&*()_+-=:;\"' "};
+    TextCharacters Characters = {renderer, font, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890,.~!@#$%^&*()_+-=:;\"'? "};
 
 
-    /* Create title text */
-    TextObject Title = {"New Piskel", Center, {windowsize.x/2, 2}};
+    /* Create text objects */
+    TextObject Title = {"New Piskel", Center, Vector2(windowsize.x/2, 18)};
+    TextObject CurSizeText = {"1x", Center, Vector2(cursizerectborder.x/2, (cursizerectborder.y+cursizerectborder.h))};
 
 
     /* Load textures */
@@ -466,11 +466,7 @@ int main(int argc, char* argv[]) {
     SDL_SetTextureScaleMode(rightcolorselector, SDL_SCALEMODE_NEAREST);
     SDL_GetTextureSize(presprite, &spriterect.w, &spriterect.h);
     spriterect = (SDL_FRect){0, 0, spriterect.w, spriterect.h };
-    SDL_Surface * tempcursizetextrect = TTF_RenderText_Blended(font, "1x", 2, (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
-    SDL_Texture * cursizetextrecture = SDL_CreateTextureFromSurface(renderer, tempcursizetextrect);
-    SDL_DestroySurface(tempcursizetextrect);
-    SDL_GetTextureSize(cursizetextrecture, &cursizetextrect.w, &cursizetextrect.h);
-    cursizetextrect = (SDL_FRect){cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2), cursizerectborder.y+cursizerectborder.h-cursizetextrect.h, cursizetextrect.w, cursizetextrect.h };
+    CurSizeText.Position = Vector2(cursizerectborder.x+(cursizerectborder.w/2), cursizerectborder.y+cursizerectborder.h-10);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
 
@@ -507,7 +503,7 @@ int main(int argc, char* argv[]) {
     colorselectelements[0] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-33, colorselectorui.y+12, colorselectelements[0].w, colorselectelements[0].h };
     colorselectelements[1] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-130, colorselectorui.y+12, colorselectelements[1].w, colorselectelements[1].h };
     colorselectelements[2] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-160, colorselectorui.y+12, colorselectelements[2].w, colorselectelements[2].h };
-    cursizerect = (SDL_FRect){(float)limit((cursizerectinborder.x+(cursizerectinborder.w/2)-((canvas.w/resolution.x)/2*(int)cursize)), cursizerectinborder.x, 100), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize), std::nullopt, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*(int)cursize, std::nullopt, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*(int)cursize, std::nullopt, -cursizerectinborder.h) };
+    cursizerect = (SDL_FRect){(float)limit((cursizerectinborder.x+(cursizerectinborder.w/2)-((canvas.w/resolution.x)/2*cursize)), cursizerectinborder.x, 100), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*cursize), std::nullopt, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*cursize, std::nullopt, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*cursize, std::nullopt, -cursizerectinborder.h) };
     SDL_SetRenderTarget(renderer, leftcolorselector);
     SDL_SetRenderDrawColor(renderer, gridmain.r, gridmain.g, gridmain.b, gridmain.a);
     SDL_RenderClear(renderer);
@@ -581,8 +577,8 @@ int main(int argc, char* argv[]) {
 
                     /* Reset canvas */
                     precanvas = (SDL_FRect){margin.a, 44, windowsize.x-margin.a-margin.b, (float)windowsize.y-52 };
-                    canvascenter = (fvec2){(margin.a/2)+((windowsize.x-margin.b)/2), 22+(((float)windowsize.y-8)/2) };
-                    canvasize = (fvec2){resratio.x*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w), resratio.y*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w) };
+                    canvascenter = Vector2((margin.a/2)+((windowsize.x-margin.b)/2), 22+(((float)windowsize.y-8)/2));
+                    canvasize = Vector2(resratio.x*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w), resratio.y*((precanvas.w>precanvas.h)?precanvas.h:precanvas.w));
                     canvas = (SDL_FRect){canvas.x, canvas.y, canvas.w*(canvasize.x/oldcanvasize.x), canvas.h*(canvasize.y/oldcanvasize.y) };
                     if (canvas.w<=precanvas.w) canvas.x=(precanvas.x+((precanvas.w-canvas.w)/2));
                     if (canvas.h<=precanvas.h) canvas.y=(precanvas.y+((precanvas.h-canvas.h)/2));
@@ -596,7 +592,7 @@ int main(int argc, char* argv[]) {
 
 
                     /* Reset pen size text */
-                    cursizetextrect = (SDL_FRect){cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2), cursizerectborder.y+cursizerectborder.h-cursizetextrect.h, cursizetextrect.w, cursizetextrect.h };
+                    CurSizeText.Position = Vector2(cursizerectborder.x+(cursizerectborder.w/2), cursizerectborder.y+cursizerectborder.h-10);
 
 
                     /* Reset color preview position */
@@ -652,7 +648,7 @@ int main(int argc, char* argv[]) {
 
 
                     /* Reset UI */
-                    cursizerect = (SDL_FRect){(float)limit((cursizerectinborder.x+(cursizerectinborder.w/2)-((canvas.w/resolution.x)/2*(int)cursize)), cursizerectinborder.x, 100), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize), std::nullopt, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*(int)cursize, std::nullopt, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*(int)cursize, std::nullopt, -cursizerectinborder.h) };
+                    cursizerect = (SDL_FRect){(float)limit((cursizerectinborder.x+(cursizerectinborder.w/2)-((canvas.w/resolution.x)/2*cursize)), cursizerectinborder.x, 100), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*cursize), std::nullopt, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*cursize, std::nullopt, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*cursize, std::nullopt, -cursizerectinborder.h) };
                     colorselectorui.y = leftselectedcolorealrect.y+leftselectedcolorealrect.h+12;
                     colorselectrealrect = { colorselectorui.x+colorselectorui.w-158, colorselectorui.y+12, 20, 24 };
                     colorselectelements[0] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-34, colorselectorui.y+12, colorselectelements[0].w, colorselectelements[0].h };
@@ -735,24 +731,12 @@ int main(int argc, char* argv[]) {
 
                     /* Reset pen size */
                     else{
-                        if ((int)cursize!=(int)limit(cursize+(scroll.y/10), 1, std::max(resolution.x, resolution.y))){
-                            SDL_DestroyTexture(cursizetextrecture);
-                            char tempchar[256];
-                            snprintf(tempchar, sizeof(tempchar), "%d%s", (int)limit(cursize+(scroll.y/10), 1, std::max(resolution.x, resolution.y)), "x");
-                            tempcursizetextrect = TTF_RenderText_Blended(font, tempchar, strlen(tempchar), (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
-                            cursizetextrecture = SDL_CreateTextureFromSurface(renderer, tempcursizetextrect);
-                            SDL_DestroySurface(tempcursizetextrect);
-                            SDL_GetTextureSize(cursizetextrecture, &cursizetextrect.w, &cursizetextrect.h);
-                            SDL_DestroySurface(tempcursizetextrect);
-                            remove(tempchar);
+                        if (cursize!=(int)limit(cursize+scroll.y, 1, std::max(resolution.x, resolution.y))){
+                            CurSizeText.Text = std::to_string((int)limit(cursize+scroll.y, 1, std::max(resolution.x, resolution.y))) + "x";
                         }
-                        cursize=limit(cursize+(scroll.y/10), 1, std::max(resolution.x, resolution.y));
-
-
-                        /* Reset pen size text */
-                        cursizetextrect = (SDL_FRect){cursizerectborder.x+((cursizerectborder.w-cursizetextrect.w)/2), cursizerectborder.y+cursizerectborder.h-cursizetextrect.h, cursizetextrect.w, cursizetextrect.h };
+                        cursize = limit(cursize+scroll.y, 1, std::max(resolution.x, resolution.y));
                     }
-                    cursizerect = (SDL_FRect){(float)limit((cursizerectinborder.x+(cursizerectinborder.w/2)-((canvas.w/resolution.x)/2*(int)cursize)), cursizerectinborder.x, 100), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*(int)cursize), std::nullopt, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*(int)cursize, std::nullopt, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*(int)cursize, std::nullopt, -cursizerectinborder.h) };
+                    cursizerect = (SDL_FRect){(float)limit((cursizerectinborder.x+(cursizerectinborder.w/2)-((canvas.w/resolution.x)/2*cursize)), cursizerectinborder.x, 100), (float)limit(cursizerectinborder.y-(cursizerectinborder.w/2)+((canvas.w/resolution.y)/2*cursize), std::nullopt, cursizerectinborder.y), (float)limit(canvas.w/resolution.x*cursize, std::nullopt, cursizerectinborder.w), -(float)limit(canvas.h/resolution.y*cursize, std::nullopt, -cursizerectinborder.h) };
                     break;
 
 
@@ -796,12 +780,12 @@ int main(int argc, char* argv[]) {
                         SDL_SetRenderTarget(renderer, sprite[frame]);
                         if (mousebitmask & SDL_BUTTON_LMASK) SDL_SetRenderDrawColor(renderer, leftcolor.r, leftcolor.g, leftcolor.b, leftcolor.a);
                         else if (mousebitmask & SDL_BUTTON_RMASK) SDL_SetRenderDrawColor(renderer, rightcolor.r, rightcolor.g, rightcolor.b, rightcolor.a);
-                        fvec2 roundlastmouse = (fvec2){(float)(int)(((lastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)), (float)(int)(((lastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)) };
-                        fvec2 roundmouse = (fvec2){(float)(int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)), (float)(int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)) };
-                        fvec2 fakeroundmouse = roundmouse;
-                        if (keystates[SDL_SCANCODE_LSHIFT]) fakeroundmouse = (fvec2){ (float)(sin(round(atan2(roundmouse.x-roundlastmouse.x, roundmouse.y-roundlastmouse.y)/M_EIGHTHPI)*M_EIGHTHPI)*sqrt(((roundmouse.x-roundlastmouse.x)*(roundmouse.x-roundlastmouse.x))+((roundmouse.y-roundlastmouse.y)*(roundmouse.y-roundlastmouse.y))))+roundlastmouse.x, (float)(cos(round(atan2(roundmouse.x-roundlastmouse.x, roundmouse.y-roundlastmouse.y)/M_EIGHTHPI)*M_EIGHTHPI)*sqrt(((roundmouse.x-roundlastmouse.x)*(roundmouse.x-roundlastmouse.x))+((roundmouse.y-roundlastmouse.y)*(roundmouse.y-roundlastmouse.y))))+roundlastmouse.y };
-                        for (int y = 0; y < (int)cursize; y++) {
-                            for (int x = 0; x < (int)cursize; x++) {
+                        Vector2 roundlastmouse = Vector2((float)(int)(((lastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)), (float)(int)(((lastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)));
+                        Vector2 roundmouse = Vector2((float)(int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)), (float)(int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)));
+                        Vector2 fakeroundmouse = roundmouse;
+                        if (keystates[SDL_SCANCODE_LSHIFT]) fakeroundmouse = Vector2((float)(sin(round(atan2(roundmouse.x-roundlastmouse.x, roundmouse.y-roundlastmouse.y)/M_EIGHTHPI)*M_EIGHTHPI)*sqrt(((roundmouse.x-roundlastmouse.x)*(roundmouse.x-roundlastmouse.x))+((roundmouse.y-roundlastmouse.y)*(roundmouse.y-roundlastmouse.y))))+roundlastmouse.x, (float)(cos(round(atan2(roundmouse.x-roundlastmouse.x, roundmouse.y-roundlastmouse.y)/M_EIGHTHPI)*M_EIGHTHPI)*sqrt(((roundmouse.x-roundlastmouse.x)*(roundmouse.x-roundlastmouse.x))+((roundmouse.y-roundlastmouse.y)*(roundmouse.y-roundlastmouse.y))))+roundlastmouse.y);
+                        for (int y = 0; y < cursize; y++) {
+                            for (int x = 0; x < cursize; x++) {
                                 SDL_RenderLine(renderer, roundlastmouse.x+x, roundlastmouse.y+y, fakeroundmouse.x+x, fakeroundmouse.y+y );
                             }
                         }
@@ -882,9 +866,9 @@ int main(int argc, char* argv[]) {
                 if (currentool == 0) {
                     SDL_SetRenderTarget(renderer, sprite[frame]);
                     (mousebitmask & SDL_BUTTON_LMASK)?SDL_SetRenderDrawColor(renderer, leftcolor.r, leftcolor.g, leftcolor.b, leftcolor.a):SDL_SetRenderDrawColor(renderer, rightcolor.r, rightcolor.g, rightcolor.b, rightcolor.a);
-                    for (int y = 0; y < (int)cursize; y++) {
-                        for (int x = 0; x < (int)cursize; x++) {
-                            SDL_RenderLine(renderer, (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y);
+                    for (int y = 0; y < cursize; y++) {
+                        for (int x = 0; x < cursize; x++) {
+                            SDL_RenderLine(renderer, (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y);
                         }
                     }
                     SDL_SetRenderTarget(renderer, NULL);
@@ -897,12 +881,12 @@ int main(int argc, char* argv[]) {
                     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
                     SDL_RenderClear(renderer);
                     SDL_SetRenderDrawColor(renderer, 160, 215, 240, 153);
-                    fvec2 roundlastmouse = (fvec2){(float)(int)(((lastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)), (float)(int)(((lastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)) };
-                    fvec2 roundmouse = (fvec2){(float)(int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)), (float)(int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)) };
-                    fvec2 fakeroundmouse = roundmouse;
-                    if (keystates[SDL_SCANCODE_LSHIFT]) fakeroundmouse = (fvec2){ (float)(sin(round(atan2(roundmouse.x-roundlastmouse.x, roundmouse.y-roundlastmouse.y)/M_EIGHTHPI)*M_EIGHTHPI)*sqrt(((roundmouse.x-roundlastmouse.x)*(roundmouse.x-roundlastmouse.x))+((roundmouse.y-roundlastmouse.y)*(roundmouse.y-roundlastmouse.y))))+roundlastmouse.x, (float)(cos(round(atan2(roundmouse.x-roundlastmouse.x, roundmouse.y-roundlastmouse.y)/M_EIGHTHPI)*M_EIGHTHPI)*sqrt(((roundmouse.x-roundlastmouse.x)*(roundmouse.x-roundlastmouse.x))+((roundmouse.y-roundlastmouse.y)*(roundmouse.y-roundlastmouse.y))))+roundlastmouse.y };
-                    for (int y = 0; y < (int)cursize; y++) {
-                        for (int x = 0; x < (int)cursize; x++) {
+                    Vector2 roundlastmouse = Vector2((float)(int)(((lastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)), (float)(int)(((lastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)));
+                        Vector2 roundmouse = Vector2((float)(int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x)), (float)(int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y)));
+                    Vector2 fakeroundmouse = roundmouse;
+                    if (keystates[SDL_SCANCODE_LSHIFT]) fakeroundmouse = Vector2((float)(sin(round(atan2(roundmouse.x-roundlastmouse.x, roundmouse.y-roundlastmouse.y)/M_EIGHTHPI)*M_EIGHTHPI)*sqrt(((roundmouse.x-roundlastmouse.x)*(roundmouse.x-roundlastmouse.x))+((roundmouse.y-roundlastmouse.y)*(roundmouse.y-roundlastmouse.y))))+roundlastmouse.x, (float)(cos(round(atan2(roundmouse.x-roundlastmouse.x, roundmouse.y-roundlastmouse.y)/M_EIGHTHPI)*M_EIGHTHPI)*sqrt(((roundmouse.x-roundlastmouse.x)*(roundmouse.x-roundlastmouse.x))+((roundmouse.y-roundlastmouse.y)*(roundmouse.y-roundlastmouse.y))))+roundlastmouse.y);
+                    for (int y = 0; y < cursize; y++) {
+                        for (int x = 0; x < cursize; x++) {
                             SDL_RenderLine(renderer, roundlastmouse.x+x, roundlastmouse.y+y, fakeroundmouse.x+x, fakeroundmouse.y+y );
                         }
                     }
@@ -914,9 +898,9 @@ int main(int argc, char* argv[]) {
                 else if (currentool == 2) {
                     SDL_SetRenderTarget(renderer, sprite[frame]);
                     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-                    for (int y = 0; y < (int)cursize; y++) {
-                        for (int x = 0; x < (int)cursize; x++) {
-                            SDL_RenderLine(renderer, (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, (int)((mouse.x-canvas.x)/(canvas.w/resolution.x)), (int)((mouse.y-canvas.y)/(canvas.h/resolution.y)));
+                    for (int y = 0; y < cursize; y++) {
+                        for (int x = 0; x < cursize; x++) {
+                            SDL_RenderLine(renderer, (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, (int)((mouse.x-canvas.x)/(canvas.w/resolution.x)), (int)((mouse.y-canvas.y)/(canvas.h/resolution.y)));
                         }
                     }
                     SDL_SetRenderTarget(renderer, NULL);
@@ -927,39 +911,39 @@ int main(int argc, char* argv[]) {
                 else if (currentool == 3) {
                     SDL_SetRenderTarget(renderer, sprite[frame]);
                     (mousebitmask & SDL_BUTTON_LMASK)?SDL_SetRenderDrawColor(renderer, leftcolor.r, leftcolor.g, leftcolor.b, leftcolor.a):SDL_SetRenderDrawColor(renderer, rightcolor.r, rightcolor.g, rightcolor.b, rightcolor.a);
-                    for (int y = 0; y < (int)cursize; y++) {
-                        for (int x = 0; x < (int)cursize; x++) {
-                            SDL_RenderLine(renderer, (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y);
+                    for (int y = 0; y < cursize; y++) {
+                        for (int x = 0; x < cursize; x++) {
+                            SDL_RenderLine(renderer, (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y);
                         }
                     }
                     if (keystates[SDL_SCANCODE_LSHIFT]) {
-                        for (int y = 0; y < (int)cursize; y++) {
-                            for (int x = 0; x < (int)cursize; x++) {
-                                SDL_RenderLine(renderer, (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, -(int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y+resolution.y-(int)cursize, (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, -(int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y+resolution.y-(int)cursize);
+                        for (int y = 0; y < cursize; y++) {
+                            for (int x = 0; x < cursize; x++) {
+                                SDL_RenderLine(renderer, (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, -(int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y+resolution.y-cursize, (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, -(int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y+resolution.y-cursize);
                             }
                         }
-                        for (int y = 0; y < (int)cursize; y++) {
-                            for (int x = 0; x < (int)cursize; x++) {
-                                SDL_RenderLine(renderer, -(int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x+resolution.x-(int)cursize, -(int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y+resolution.y-(int)cursize, -(int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x+resolution.x-(int)cursize, -(int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y+resolution.y-(int)cursize);
+                        for (int y = 0; y < cursize; y++) {
+                            for (int x = 0; x < cursize; x++) {
+                                SDL_RenderLine(renderer, -(int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x+resolution.x-cursize, -(int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y+resolution.y-cursize, -(int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x+resolution.x-cursize, -(int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y+resolution.y-cursize);
                             }
                         }
-                        for (int y = 0; y < (int)cursize; y++) {
-                            for (int x = 0; x < (int)cursize; x++) {
-                                SDL_RenderLine(renderer, -(int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x+resolution.x-(int)cursize, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, -(int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x+resolution.x-(int)cursize, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y);
+                        for (int y = 0; y < cursize; y++) {
+                            for (int x = 0; x < cursize; x++) {
+                                SDL_RenderLine(renderer, -(int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x+resolution.x-cursize, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, -(int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x+resolution.x-cursize, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y);
                             }
                         }
                     }
                     else if (keystates[SDL_SCANCODE_LCTRL]) {
-                        for (int y = 0; y < (int)cursize; y++) {
-                            for (int x = 0; x < (int)cursize; x++) {
-                                SDL_RenderLine(renderer, (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, -(int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y+resolution.y-(int)cursize, (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, -(int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y+resolution.y-(int)cursize);
+                        for (int y = 0; y < cursize; y++) {
+                            for (int x = 0; x < cursize; x++) {
+                                SDL_RenderLine(renderer, (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, -(int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y+resolution.y-cursize, (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, -(int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y+resolution.y-cursize);
                             }
                         }
                     }
                     else {
-                        for (int y = 0; y < (int)cursize; y++) {
-                            for (int x = 0; x < (int)cursize; x++) {
-                                SDL_RenderLine(renderer, -(int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x+resolution.x-(int)cursize, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, -(int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x+resolution.x-(int)cursize, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y);
+                        for (int y = 0; y < cursize; y++) {
+                            for (int x = 0; x < cursize; x++) {
+                                SDL_RenderLine(renderer, -(int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x+resolution.x-cursize, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y, -(int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x+resolution.x-cursize, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y);
                             }
                         }
                     }
@@ -970,9 +954,9 @@ int main(int argc, char* argv[]) {
                 /* Draw dithered line from framelastmouse to mouse */
                 else if (currentool == 4) {
                     SDL_SetRenderTarget(renderer, sprite[frame]);
-                    for (int y = 0; y < (int)cursize; y++) {
-                        for (int x = 0; x < (int)cursize; x++) {
-                            ditherline(renderer, leftcolor, rightcolor, (vec2){(int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y}, (vec2){(int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y}, (mousebitmask & SDL_BUTTON_LMASK));
+                    for (int y = 0; y < cursize; y++) {
+                        for (int x = 0; x < cursize; x++) {
+                            ditherline(renderer, leftcolor, rightcolor, (vec2){(int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y}, (vec2){(int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y}, (mousebitmask & SDL_BUTTON_LMASK));
                         }
                     }
                     SDL_SetRenderTarget(renderer, NULL);
@@ -987,9 +971,9 @@ int main(int argc, char* argv[]) {
                             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
                             SDL_RenderClear(renderer);
                         }
-                        for (int y = 0; y < (int)cursize; y++) {
-                            for (int x = 0; x < (int)cursize; x++) {
-                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), false);
+                        for (int y = 0; y < cursize; y++) {
+                            for (int x = 0; x < cursize; x++) {
+                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), false);
                             }
                         }
                         SDL_SetRenderTarget(renderer, NULL);
@@ -1005,9 +989,9 @@ int main(int argc, char* argv[]) {
                             SDL_RenderClear(renderer);
                             SDL_SetRenderTarget(renderer, sprite[frame]);
                         }
-                        for (int y = 0; y < (int)cursize; y++) {
-                            for (int x = 0; x < (int)cursize; x++) {
-                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*((int)cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*((int)cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), true);
+                        for (int y = 0; y < cursize; y++) {
+                            for (int x = 0; x < cursize; x++) {
+                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), true);
                             }
                         }
                         SDL_SetRenderTarget(renderer, NULL);
@@ -1069,7 +1053,7 @@ int main(int argc, char* argv[]) {
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
             SDL_RenderClear(renderer);
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, 51);
-            cursorturect = (SDL_FRect){(float)(int)((((mouse.x-canvas.x)/canvas.w)*resolution.x)-((float)(int)(cursize-1)/2)), (float)(int)((((mouse.y-canvas.y)/canvas.h)*resolution.y)-((float)(int)(cursize-1)/2)), (float)(int)cursize, (float)(int)cursize };
+            cursorturect = (SDL_FRect){(float)(int)((((mouse.x-canvas.x)/canvas.w)*resolution.x)-((float)(int)(cursize-1)/2)), (float)(int)((((mouse.y-canvas.y)/canvas.h)*resolution.y)-((float)(int)(cursize-1)/2)), (float)cursize, (float)cursize };
             SDL_RenderFillRect(renderer, &cursorturect);
             SDL_SetRenderTarget(renderer, NULL);
             SDL_RenderTexture(renderer, cursorture, NULL, &canvas);
@@ -1166,7 +1150,7 @@ int main(int argc, char* argv[]) {
 
 
         /* Render UI text */
-        SDL_RenderTexture(renderer, cursizetextrecture, NULL, &cursizetextrect);
+        CurSizeText.Render(renderer, Characters);
         Title.Render(renderer, Characters);
 
 
