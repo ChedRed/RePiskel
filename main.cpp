@@ -1,18 +1,6 @@
-#include <cstdlib>
-#include <iostream>
-#define _USE_MATH_DEFINES
-#include <cmath>
-#include <string>
-#include <vector>
-#include <optional>
-#ifdef _WIN32
-#include <Windows.h>
-#endif
-#include <algorithm>
-#define SDL_MAIN_HANDLED
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
-#include <SDL3_ttf/SDL_ttf.h>
+#include "IncAll.h"
+#include "TextHelp.hpp"
+#include "Vector2.hpp"
 
 
 #undef min
@@ -80,7 +68,6 @@ bool oldmousedown = false;
 
 /* UI */
 duo margin = { 240, 260 };
-SDL_FRect tirect;
 SDL_FRect nameborder = { 0, 0, (float)windowsize.x, 36 };
 
 
@@ -336,24 +323,20 @@ int main(int argc, char* argv[]) {
 
     /* Initialize SDL_ttf, create font object */
     TTF_Init();
-    char tempath[256];
-    snprintf(tempath, sizeof(tempath), "%s%s%s", SDL_GetBasePath(), rpath.c_str(), "FreeSans.ttf");
-    TTF_Font * font = TTF_OpenFont(tempath, 24);
+    TTF_Font * font = TTF_OpenFont((SDL_GetBasePath()+rpath+"FreeSans.ttf").c_str(), 24);
+
+
+    /* Init text assistant :) */
+    TextCharacters Characters = {renderer, font, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890,.~!@#$%^&*()_+-=:;\"' "};
 
 
     /* Create title text */
-    SDL_Surface * pretitle = TTF_RenderText_Blended(font, "New Piskel", 10, (SDL_Color){ .r=255, .g=255, .b=255, .a=255 });
-    SDL_Texture * title = SDL_CreateTextureFromSurface(renderer, pretitle);
-    SDL_GetTextureSize(title, &tirect.w, &tirect.h);
-    tirect.x = ((float)windowsize.x/2)-((float)tirect.w/2);
-    tirect.y = 18-(tirect.h/2);
-    SDL_DestroySurface(pretitle);
+    TextObject Title = {"New Piskel", Center, {windowsize.x/2, 2}};
 
 
     /* Load textures */
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-    snprintf(tempath, sizeof(tempath), "%s%s%s", SDL_GetBasePath(), rpath.c_str(), "tools.bmp");
-    SDL_Surface * pretools = SDL_LoadBMP(tempath);
+    SDL_Surface * pretools = SDL_LoadBMP((SDL_GetBasePath()+rpath+"tools.bmp").c_str());
     SDL_Texture * tools = SDL_CreateTextureFromSurface(renderer, pretools);
     SDL_GetTextureSize(tools, &toolsrect.w, &toolsrect.h);
     toolsrect = (SDL_FRect){toolsrect.x, ((float)windowsize.y/2)-(toolsrect.h/(toolsrect.h/toolsuiwidth)), toolsuiwidth, toolsuiwidth*(toolsrect.h/toolsrect.w) };
@@ -593,7 +576,7 @@ int main(int argc, char* argv[]) {
 
                     /* Reset ui */
                     nameborder.w = windowsize.x;
-                    tirect.x = ((float)windowsize.x/2)-((float)tirect.w/2);
+                    Title.Position = Vector2(windowsize.x/2, Title.Position.y);
 
 
                     /* Reset canvas */
@@ -1184,10 +1167,7 @@ int main(int argc, char* argv[]) {
 
         /* Render UI text */
         SDL_RenderTexture(renderer, cursizetextrecture, NULL, &cursizetextrect);
-
-
-        /* Render title text */
-        SDL_RenderTexture(renderer, title, NULL, &tirect);
+        Title.Render(renderer, Characters);
 
 
         /* Push render content */
@@ -1206,7 +1186,6 @@ int main(int argc, char* argv[]) {
 
 
     /* Exit properly */
-    SDL_DestroyTexture(title);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
