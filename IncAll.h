@@ -14,3 +14,12 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include "Vector2.hpp"
+
+#undef min
+#undef max
+#define elif else if
+#ifdef _WIN32
+#define SDL_MODKEY SDL_SCANCODE_LCTRL
+#elifdef __APPLE__
+#define SDL_MODKEY SDL_SCANCODE_LGUI
+#endif

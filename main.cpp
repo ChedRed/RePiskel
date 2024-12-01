@@ -1,16 +1,8 @@
+#include "SDL3/SDL_events.h"
+#include "SDL3/SDL_oldnames.h"
+#include "SDL3/SDL_video.h"
 #define _USE_MATH_DEFINES
 #include "TextHelp.hpp"
-#include "Vector2.hpp"
-
-
-#undef min
-#undef max
-#define elif else if
-#ifdef _WIN32
-#define SDL_MODKEY SDL_SCANCODE_LCTRL
-#elifdef __APPLE__
-#define SDL_MODKEY SDL_SCANCODE_LGUI
-#endif
 
 
 /*
@@ -63,6 +55,7 @@ Uint32 mousebitmask;
 const bool * keystates = SDL_GetKeyboardState(NULL);
 bool oldshift = false;
 bool oldmousedown = false;
+bool oldleftmousedown = false;
 
 
 /* UI */
@@ -71,6 +64,7 @@ SDL_FRect nameborder = { 0, 0, (float)windowsize.x, 36 };
 
 
 /* Canvas */
+bool edited = false;
 Vector2 resolution = { 16, 16 };
 Vector2 drawresolution = { 0, 0 };
 Vector2 resratio = Vector2((resolution.x<resolution.y)?(float)resolution.x/resolution.y:1, (resolution.x>resolution.y)?(float)resolution.y/resolution.x:1);
@@ -192,22 +186,6 @@ SDL_Vertex canvasborders[] = {
 int canvasborderindicies[] = { 0, 1, 3, 3, 2, 1, 2, 3, 7, 7, 6, 2, 6, 7, 4, 4, 5, 6, 5, 4, 1, 1, 0, 4 };
 
 
-/* Interpolation function */
-double lerp(double a, double b, double c) { return a+((b-a)*c); }
-
-
-/* Limit function */
-double limit(double value, std::optional<double> min = std::nullopt, std::optional<double> max = std::nullopt) { return ((min.has_value())?((max.has_value())?(value>max?max:(value<min?min:value)):(value<min?min:value)):((max.has_value())?(value>max?max:value):value)).value(); }
-
-
-/* Within limit function */
-bool inlimit(double value, std::optional<double> min = std::nullopt, std::optional<double> max = std::nullopt) { return (min.has_value())?((max.has_value())?(value<max&&value>=min):(value>=min)):((max.has_value())?(value<max):true); }
-
-
-/* Contained function */
-bool contained(Vector2 point, SDL_FRect container) { return ((container.w>0)?point.x>container.x:point.x<container.x) && ((container.h>0)?point.y>container.y:point.y<container.y) && ((container.w>0)?point.x<container.x+container.w:point.x>container.x+container.w) && ((container.h>0)?point.y<container.y+container.h:point.y>container.y+container.h); }
-
-
 /* Secondary line function for dithering */
 void ditherline(SDL_Renderer * renderer, SDL_Color cola, SDL_Color colb, vec2 start, vec2 end, bool primary) {
     vec2 distance = { abs(end.x-start.x), abs(end.y-start.y) };
@@ -238,15 +216,17 @@ void ditherline(SDL_Renderer * renderer, SDL_Color cola, SDL_Color colb, vec2 st
 
 
 /* Tertiary line function for lighten */
-void lightenline(SDL_Renderer * renderer, vec2 start, vec2 end, bool darken, bool add) { // Fix brightening invisible pixels (preferably with GetSurfacePixel)
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 16);
-    if (add) ((darken)?SDL_SetRenderDrawBlendMode(renderer, straightdarken):SDL_SetRenderDrawBlendMode(renderer, straightbrighten));
-    else SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+void lightenline(SDL_Renderer * renderer, vec2 start, vec2 end, bool darken, bool safe) { // Fix brightening invisible pixels (preferably with GetSurfacePixel)
+    SDL_Color thispixel;
+    int addvalue = 0;
     vec2 distance = { abs(end.x-start.x), abs(end.y-start.y) };
     vec2 mirror = { (start.x<end.x)?1:-1, (start.y<end.y) ?1:-1 };
     int err = distance.x-distance.y;
 
     while (true) {
+        SDL_ReadSurfacePixel(prespritesurface, start.x, start.y, &thispixel.r, &thispixel.g, &thispixel.b, &thispixel.a);
+        addvalue = (thispixel.a==0&&safe)?0:((darken)?-16:16);
+        SDL_SetRenderDrawColor(renderer, limit(thispixel.r + addvalue, 0, 255), limit(thispixel.g + addvalue, 0, 255), limit(thispixel.b + addvalue, 0, 255), thispixel.a);
         SDL_RenderPoint(renderer, start.x, start.y);
 
         if (std::abs(start.x-end.x)<=1 && std::abs(start.y-end.y)<=1) break;
@@ -316,6 +296,7 @@ int main(int argc, char* argv[]) {
     SDL_SetWindowMinimumSize(window, 960, 540);
     SDL_SetRenderVSync(renderer, 1);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_StartTextInput(window);
     std::cout << "Success! Initializing loop" << std::endl;
 
 
@@ -329,8 +310,8 @@ int main(int argc, char* argv[]) {
 
 
     /* Create text objects */
-    TextObject Title = {"New Piskel", Center, Vector2(windowsize.x/2, 18)};
-    TextObject CurSizeText = {"1x", Center, Vector2(cursizerectborder.x/2, (cursizerectborder.y+cursizerectborder.h))};
+    TextObject Title = {"New Piskel", Center, Vector2(windowsize.x/2, 18), true};
+    TextObject CurSizeText = {"1x", Center, Vector2(cursizerectborder.x/2, (cursizerectborder.y+cursizerectborder.h)), false};
 
 
     /* Load textures */
@@ -548,10 +529,11 @@ int main(int argc, char* argv[]) {
                 SDL_RenderFillRect(renderer, &grid); }}
 
 
-        /* Update mouse */
+        /* Update mouse and input text */
         mousebitmask = SDL_GetMouseState(&mouse.x, &mouse.y);
         scroll.x = 0;
         scroll.y = 0;
+        std::string Input = "";
 
 
         /* Poll inputs */
@@ -852,6 +834,11 @@ int main(int argc, char* argv[]) {
                         canvasborders[7].position = (SDL_FPoint){ precanvas.x+precanvas.w, precanvas.y+precanvas.h };
                     }
                     break;
+
+
+                case SDL_EVENT_TEXT_INPUT:
+                    Input = e.text.text;
+                    break;
             }
         }
 
@@ -964,42 +951,18 @@ int main(int argc, char* argv[]) {
 
                 /* Increase or decrease a pixel's brightness */
                 else if (currentool == 5) {
-                    if (keystates[SDL_SCANCODE_LSHIFT]) {
-                        SDL_SetRenderTarget(renderer, presprite);
-                        if (!oldmousedown || !oldshift) {
-                            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-                            SDL_RenderClear(renderer);
-                        }
-                        for (int y = 0; y < cursize; y++) {
-                            for (int x = 0; x < cursize; x++) {
-                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), true);
-                            }
-                        }
-                        SDL_SetRenderTarget(renderer, NULL);
-                    }
-                    else {
                         SDL_SetRenderTarget(renderer, sprite[frame]);
-                        if (oldshift) {
-                            SDL_RenderTexture(renderer, presprite, NULL, &spriterect);
-                        }
-                        else {
-                            SDL_SetRenderTarget(renderer, presprite);
-                            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-                            SDL_RenderClear(renderer);
-                            SDL_SetRenderTarget(renderer, sprite[frame]);
-                        }
                         for (int y = 0; y < cursize; y++) {
                             for (int x = 0; x < cursize; x++) {
-                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), false);
+                                lightenline(renderer, (vec2){ (int)(((framelastmouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((framelastmouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (vec2){ (int)(((mouse.x-((canvas.w/resolution.x)*(cursize-1)/2))-canvas.x)/(canvas.w/resolution.x))+x, (int)(((mouse.y-((canvas.h/resolution.y)*(cursize-1)/2))-canvas.y)/(canvas.h/resolution.y))+y }, (mousebitmask & SDL_BUTTON_RMASK), !keystates[SDL_SCANCODE_LSHIFT]);
                             }
                         }
                         SDL_SetRenderTarget(renderer, NULL);
-                    }
                 }
 
 
                 /* Pick color */
-                else if (currentool == 17) {
+                else if (currentool == 16) {
                     if (contained(mouse, canvas)) {
                         (mousebitmask & SDL_BUTTON_LMASK)?SDL_ReadSurfacePixel(prespritesurface, (mouse.x-canvas.x)/(canvas.w/resolution.x), (mouse.y-canvas.y)/(canvas.h/resolution.y), &leftcolor.r, &leftcolor.g, &leftcolor.b, &leftcolor.a):SDL_ReadSurfacePixel(prespritesurface, (mouse.x-canvas.x)/(canvas.w/resolution.x), (mouse.y-canvas.y)/(canvas.h/resolution.y), &rightcolor.r, &rightcolor.g, &rightcolor.b, &rightcolor.a);
                         if (mousebitmask & SDL_BUTTON_LMASK){
@@ -1167,7 +1130,7 @@ int main(int argc, char* argv[]) {
 
         /* Render UI text */
         CurSizeText.Render(renderer, Characters);
-        Title.Render(renderer, Characters);
+        Title.Render(renderer, Characters, deltime, mouse, mousebitmask & SDL_BUTTON_LMASK, oldmousedown);
 
 
         /* Push render content */
@@ -1178,6 +1141,7 @@ int main(int argc, char* argv[]) {
         framelastmouse = mouse;
         oldshift = keystates[SDL_SCANCODE_LSHIFT];
         oldmousedown = (mousebitmask & SDL_BUTTON_LMASK || mousebitmask & SDL_BUTTON_RMASK);
+        oldleftmousedown = mousebitmask & SDL_BUTTON_LMASK;
 
 
         /* Wait if unfocussed */
@@ -1186,6 +1150,7 @@ int main(int argc, char* argv[]) {
 
 
     /* Exit properly */
+    SDL_StopTextInput(window);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
