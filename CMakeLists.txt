@@ -15,9 +15,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Main executable
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    add_executable(RePiskel MACOSX_BUNDLE main.cpp TextHelp.cpp buildfiles/icon.icns)
+    add_executable(RePiskel MACOSX_BUNDLE main.cpp buildfiles/icon.icns)
 else(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    add_executable(RePiskel WIN32 main.cpp TextHelp.cpp buildfiles/wicon.rc)
+    add_executable(RePiskel WIN32 main.cpp buildfiles/wicon.rc)
 endif()
 
 

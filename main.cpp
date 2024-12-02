@@ -302,7 +302,7 @@ int main(int argc, char* argv[]) {
 
     /* Initialize SDL_ttf, create font object */
     TTF_Init();
-    TTF_Font * font = TTF_OpenFont((SDL_GetBasePath()+rpath+"FreeSans.ttf").c_str(), 24);
+    TTF_Font * font = TTF_OpenFont((SDL_GetBasePath()+rpath+"Font.ttf").c_str(), 24);
 
 
     /* Init text assistant :) */
@@ -1130,7 +1130,7 @@ int main(int argc, char* argv[]) {
 
         /* Render UI text */
         CurSizeText.Render(renderer, Characters);
-        Title.Render(renderer, Characters, deltime, mouse, mousebitmask & SDL_BUTTON_LMASK, oldmousedown);
+        Title.Render(renderer, Characters, deltime, mouse, mousebitmask & SDL_BUTTON_LMASK, oldmousedown, Input);
 
 
         /* Push render content */

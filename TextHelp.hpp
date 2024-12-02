@@ -1,9 +1,8 @@
 #pragma once
 #include "MoreMaths.hpp"
 #include "SDL3/SDL_blendmode.h"
-#include "SDL3/SDL_keyboard.h"
 #include "SDL3/SDL_render.h"
-#include "Vector2.hpp"
+#include "SDL3/SDL_video.h"
 #include <cmath>
 #include <string>
 #include <vector>
@@ -119,60 +118,95 @@ inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Character
     std::modf(Incrementime, &Incrementpart);
     SDL_FRect charect = {Position.x, Position.y - (Characters.GetMaxHeight(Text)/2), 0, 0};
     SDL_Texture * curchar;
-
-
     if (Align != Left){
         charect.x -= Characters.GetTotalLength(Text) * (((float)(Align+1))/2);
     }
-    InitialCursorPos = (LeftMouseState && !OldLeftMouseState)?CursorPosition:InitialCursorPos;
-    Editing = contained(InitialCursorPos, {charect.x-8, charect.y, Characters.GetTotalLength(Text)+16, Characters.GetMaxHeight(Text)}) && Editable;
-    for (int i = 0; i < Text.length(); i++){
-        curchar = Characters.GetCharacter(std::string() + Text[i]);
-        SDL_GetTextureSize(curchar, &charect.w, &charect.h);
-        if (LeftMouseState){
-            if (contained(CursorPosition, charect)){
-                if (OldLeftMouseState){
-                    SecondCursorPos = i+(CursorPosition.x-charect.x > charect.x+charect.w-CursorPosition.x);
+
+
+    if (InputChars == ""){
+        InitialCursorPos = (LeftMouseState && !OldLeftMouseState)?CursorPosition:InitialCursorPos;
+        Editing = contained(InitialCursorPos, {charect.x-8, charect.y, Characters.GetTotalLength(Text)+16, Characters.GetMaxHeight(Text)}) && Editable;
+        for (int i = 0; i < Text.length(); i++){
+            curchar = Characters.GetCharacter(std::string() + Text[i]);
+            SDL_GetTextureSize(curchar, &charect.w, &charect.h);
+            if (LeftMouseState){
+                if (contained(CursorPosition, charect)){
+                    if (!OldLeftMouseState){
+                        FirstCursorPos = i+(CursorPosition.x-charect.x > charect.x+charect.w-CursorPosition.x);
+                    }
+                        SecondCursorPos = i+(CursorPosition.x-charect.x > charect.x+charect.w-CursorPosition.x);
                 }
-                else{
-                    FirstCursorPos = i+(CursorPosition.x-charect.x > charect.x+charect.w-CursorPosition.x);
+                elif (CursorPosition.x < charect.x || CursorPosition.y < charect.y){
+                    if (i == 0){
+                        if (!OldLeftMouseState) FirstCursorPos = 0;
+                        SecondCursorPos = 0;
+                    }
+                }
+                elif ((CursorPosition.x > charect.x + charect.w || CursorPosition.y > charect.y + charect.h)){
+                    if (i == Text.length()-1){
+                        if (!OldLeftMouseState) FirstCursorPos = i+1;
+                        SecondCursorPos = i+1;
+                    }
                 }
             }
-            elif ((CursorPosition.x < charect.x || CursorPosition.y < charect.y) && OldLeftMouseState){
-                if (i == 0) SecondCursorPos = 0;
+            if (Editing){
+                if (FirstCursorPos == i){
+                    FirstCursorWindowPos = charect.x;
+                }
+                elif (FirstCursorPos == i+1){
+                    FirstCursorWindowPos = charect.x+charect.w;
+                }
+                if (SecondCursorPos == i){
+                    SecondCursorWindowPos = charect.x;
+                }
+                elif (SecondCursorPos == i+1){
+                    SecondCursorWindowPos = charect.x+charect.w;
+                }
             }
-            elif ((CursorPosition.x > charect.x + charect.w || CursorPosition.y > charect.y + charect.h) && OldLeftMouseState){
-                if (i == Text.length()-1) SecondCursorPos = i+1;
-            }
+            charect.x += charect.w;
         }
+
+
+
+        if (Editing && LastEditing){
+            SelectionRange = Vector2(FirstCursorPos, SecondCursorPos);
+            SDL_SetRenderDrawColor(renderer, 20, 20, 50, 255);
+            SDL_FRect SelectionBox = {FirstCursorWindowPos, charect.y+2, SecondCursorWindowPos-FirstCursorWindowPos, Characters.GetMaxHeight(Text)-4};
+            SDL_RenderFillRect(renderer, &SelectionBox);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColorFloat(renderer, 1, 1, 1, Incrementpart);
+            SDL_RenderLine(renderer, SecondCursorWindowPos, charect.y+2, SecondCursorWindowPos, Characters.GetMaxHeight(Text)-1);
+        }
+        charect.x = Position.x - Characters.GetTotalLength(Text) * (((float)(Align+1))/2);
+    }
+    else{
         if (Editing){
-            if (FirstCursorPos == i){
-                FirstCursorWindowPos = charect.x;
+            std::string NewText = "";
+            int LowerPos = (FirstCursorPos<SecondCursorPos)?FirstCursorPos:SecondCursorPos;
+            int HigherPos = (FirstCursorPos>SecondCursorPos)?FirstCursorPos:SecondCursorPos;
+            int NewPos = 0;
+            for (int i = 0; i < Text.length(); i++){
+                if (i < LowerPos || i >= HigherPos){
+                    NewText += Text[i];
+                    if (i+1 == LowerPos && i+1 == HigherPos){
+                        NewText += InputChars;
+                        NewPos = i+2;
+                    }
+                }
+                elif (i == LowerPos){
+                    NewText += InputChars;
+                    NewPos = i+1;
+                }
             }
-            elif (FirstCursorPos == i+1){
-                FirstCursorWindowPos = charect.x+charect.w;
-            }
-            if (SecondCursorPos == i){
-                SecondCursorWindowPos = charect.x;
-            }
-            elif (SecondCursorPos == i+1){;
-                SecondCursorWindowPos = charect.x+charect.w;
-            }
+            FirstCursorPos = NewPos;
+            SecondCursorPos = NewPos;
+            Text = NewText;
+            Editing = false;
         }
-        charect.x += charect.w;
+        if (Align != Left){
+            charect.x = Position.x - (Characters.GetTotalLength(Text) * (((float)(Align+1))/2));
+        }
     }
-
-
-
-    if (Editing && LastEditing){
-        SDL_SetRenderDrawColor(renderer, 20, 20, 50, 255);
-        SelectionRange = Vector2(FirstCursorPos, SecondCursorPos);
-        SDL_FRect SelectionBox = {FirstCursorWindowPos, charect.y, SecondCursorWindowPos-FirstCursorWindowPos, Characters.GetMaxHeight(Text)};
-        SDL_RenderFillRect(renderer, &SelectionBox);
-        SDL_SetRenderDrawColorFloat(renderer, 1, 1, 1, Incrementpart);
-        SDL_RenderLine(renderer, SecondCursorWindowPos, charect.y, SecondCursorWindowPos, Characters.GetMaxHeight(Text)+1);
-    }
-    charect.x = Position.x - Characters.GetTotalLength(Text) * (((float)(Align+1))/2);
     for (int i = 0; i < Text.length(); i++){
         curchar = Characters.GetCharacter(std::string() + Text[i]);
         SDL_GetTextureSize(curchar, &charect.w, &charect.h);
