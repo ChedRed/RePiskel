@@ -45,7 +45,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     # Add basic files to macos app
     file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/info.plist DESTINATION ${CMAKE_SOURCE_DIR}/build/RePiskel.app/Contents)
     file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/icon.icns DESTINATION ${CMAKE_SOURCE_DIR}/build/RePiskel.app/Contents/Resources)
-    file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/FreeSans.ttf DESTINATION ${CMAKE_SOURCE_DIR}/build/RePiskel.app/Contents/Resources)
+    file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/Font.ttf DESTINATION ${CMAKE_SOURCE_DIR}/build/RePiskel.app/Contents/Resources)
     file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/tools.bmp DESTINATION ${CMAKE_SOURCE_DIR}/build/RePiskel.app/Contents/Resources)
 
 
@@ -67,7 +67,7 @@ else(CMAKE_SYSTEM_NAME STREQUAL "Windows")
 
     # Add basic files to windows app
     file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/tools.bmp DESTINATION ${CMAKE_SOURCE_DIR}/build/RePiskel)
-    file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/FreeSans.ttf DESTINATION ${CMAKE_SOURCE_DIR}/build/RePiskel)
+    file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/Font.ttf DESTINATION ${CMAKE_SOURCE_DIR}/build/RePiskel)
 
 
     # Add resources to windows app
