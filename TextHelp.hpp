@@ -163,7 +163,7 @@ inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Character
                     SecondCursorWindowPos = charect.x+charect.w;
                 }
             }
-            charect.x += charect.w;
+            charect.x += charect.w - ((std::string() + Text[i]=="k" && std::string() + Text[i+1]=="e")?1:0);
         }
 
 
@@ -211,7 +211,7 @@ inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Character
         curchar = Characters.GetCharacter(std::string() + Text[i]);
         SDL_GetTextureSize(curchar, &charect.w, &charect.h);
         SDL_RenderTexture(renderer, curchar, NULL, &charect);
-        charect.x += charect.w;
+        charect.x += charect.w - ((std::string() + Text[i]=="k" && std::string() + Text[i+1]=="e")?1:0);
     }
     LastEditing = Editing;
 }
