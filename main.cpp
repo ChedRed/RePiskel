@@ -1,3 +1,4 @@
+#include "SDL3/SDL_video.h"
 #define _USE_MATH_DEFINES
 #include "TextHelp.hpp"
 
@@ -300,6 +301,10 @@ int main(int argc, char* argv[]) {
     /* Initialize SDL_ttf, create font object */
     TTF_Init();
     TTF_Font * font = TTF_OpenFont((SDL_GetBasePath()+rpath+"Font.ttf").c_str(), 26);
+    // int kerning;
+    // TTF_Font * TTfont = TTF_OpenFont((SDL_GetBasePath()+rpath+"Font.ttf").c_str(), 260);
+    // TTF_GetGlyphKerning(TTfont, 107, 101, &kerning);
+    // SDL_SetWindowTitle(window, std::to_string(kerning).c_str());
 
 
     /* Init text assistant :) */
