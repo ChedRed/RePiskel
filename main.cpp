@@ -1,8 +1,3 @@
-#include "SDL3/SDL_events.h"
-#include "SDL3/SDL_keycode.h"
-#include "SDL3/SDL_oldnames.h"
-#include "SDL3/SDL_scancode.h"
-#include "SDL3/SDL_video.h"
 #define _USE_MATH_DEFINES
 #include "TextHelp.hpp"
 
@@ -304,7 +299,7 @@ int main(int argc, char* argv[]) {
 
     /* Initialize SDL_ttf, create font object */
     TTF_Init();
-    TTF_Font * font = TTF_OpenFont((SDL_GetBasePath()+rpath+"Font.ttf").c_str(), 24);
+    TTF_Font * font = TTF_OpenFont((SDL_GetBasePath()+rpath+"Font.ttf").c_str(), 26);
 
 
     /* Init text assistant :) */
