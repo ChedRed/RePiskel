@@ -1,11 +1,5 @@
 #pragma once
 #include "MoreMaths.hpp"
-#include "SDL3/SDL_blendmode.h"
-#include "SDL3/SDL_render.h"
-#include "SDL3/SDL_video.h"
-#include <cmath>
-#include <string>
-#include <vector>
 
 typedef int Alignment;
 #define Left -1
@@ -185,21 +179,54 @@ inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Character
             int LowerPos = (FirstCursorPos<SecondCursorPos)?FirstCursorPos:SecondCursorPos;
             int HigherPos = (FirstCursorPos>SecondCursorPos)?FirstCursorPos:SecondCursorPos;
             int NewPos = 0;
-            for (int i = 0; i < Text.length(); i++){
-                if (i < LowerPos || i >= HigherPos){
-                    NewText += Text[i];
-                    if (i+1 == LowerPos && i+1 == HigherPos){
-                        NewText += InputChars;
-                        NewPos = i+2;
+            int BPNewSecondPos = -1;
+            if (InputChars == "/D"){
+                for (int i = 0; i < Text.length(); i++){
+                    if (i < LowerPos || i >= HigherPos){
+                        if (i+1 == LowerPos && i+1 == HigherPos){
+                            NewPos = i;
+                        }
+                        else{
+                            NewText += Text[i];
+                        }
+                    }
+                    else{
+                        if (i == LowerPos){
+                            NewPos = i;
+                        }
                     }
                 }
-                elif (i == LowerPos){
-                    NewText += InputChars;
-                    NewPos = i+1;
+            }
+            elif (InputChars == "/L"){
+                NewPos = limit(LowerPos - 1, 0, Text.length());
+                NewText = Text;
+            }
+            elif (InputChars == "/R"){
+                NewPos = limit(LowerPos + 1, 0, Text.length());
+                NewText = Text;
+            }
+            else{
+                for (int i = 0; i < Text.length(); i++){
+                    if (i < LowerPos || i >= HigherPos){
+                        NewText += Text[i];
+                        if (i+1 == LowerPos && i+1 == HigherPos){
+                            NewText += InputChars;
+                            NewPos = i+2;
+                        }
+                    }
+                    elif (i == LowerPos){
+                        NewText += InputChars;
+                        NewPos = i+1;
+                    }
                 }
             }
             FirstCursorPos = NewPos;
-            SecondCursorPos = NewPos;
+            if (BPNewSecondPos == -1){
+                SecondCursorPos = NewPos;
+            }
+            else{
+                SecondCursorPos = BPNewSecondPos;
+            }
             Text = NewText;
             Editing = false;
         }

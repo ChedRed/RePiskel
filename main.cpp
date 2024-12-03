@@ -1,5 +1,7 @@
 #include "SDL3/SDL_events.h"
+#include "SDL3/SDL_keycode.h"
 #include "SDL3/SDL_oldnames.h"
+#include "SDL3/SDL_scancode.h"
 #include "SDL3/SDL_video.h"
 #define _USE_MATH_DEFINES
 #include "TextHelp.hpp"
@@ -833,7 +835,21 @@ int main(int argc, char* argv[]) {
                         canvasborders[6].position = (SDL_FPoint){ canvas.x+canvas.w, canvas.y+canvas.h };
                         canvasborders[7].position = (SDL_FPoint){ precanvas.x+precanvas.w, precanvas.y+precanvas.h };
                     }
+
+
+                    /* Delete */
+                    if (e.key.key == SDLK_DELETE || e.key.key == SDLK_BACKSPACE){
+                        Input = "/D";
+                    }
+                    elif (e.key.key == SDLK_LEFT){
+                        Input = "/L";
+                    }
+                    elif (e.key.key == SDLK_RIGHT){
+                        Input = "/R";
+                    }
                     break;
+
+
 
 
                 case SDL_EVENT_TEXT_INPUT:
