@@ -1,6 +1,3 @@
-#include "SDL3/SDL_keycode.h"
-#include "SDL3/SDL_scancode.h"
-#include "SDL3/SDL_video.h"
 #define _USE_MATH_DEFINES
 #include "TextHelp.hpp"
 
@@ -307,6 +304,12 @@ int main(int argc, char* argv[]) {
     // TTF_Font * TTfont = TTF_OpenFont((SDL_GetBasePath()+rpath+"Font.ttf").c_str(), 260);
     // TTF_GetGlyphKerning(TTfont, 107, 101, &kerning);
     // SDL_SetWindowTitle(window, std::to_string(kerning).c_str());
+    // SDL_Surface * tempsurface = TTF_RenderText_Blended(font, "New Piskel", 10, {255, 255, 255, 255});
+    // SDL_Texture * tempthisthat = SDL_CreateTextureFromSurface(renderer, tempsurface);
+    // SDL_DestroySurface(tempsurface);
+    // SDL_FRect tempthisthatrect = {0, 0, 0, 0};
+    // SDL_GetTextureSize(tempthisthat, &tempthisthatrect.w, &tempthisthatrect.h);
+    // tempthisthatrect = {((float)windowsize.x/2)-(tempthisthatrect.w/2), 18-(tempthisthatrect.h/2), tempthisthatrect.w, tempthisthatrect.h};
 
 
     /* Init text assistant :) */
