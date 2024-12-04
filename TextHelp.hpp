@@ -168,7 +168,7 @@ inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Character
             SDL_FRect SelectionBox = {FirstCursorWindowPos, charect.y+2, SecondCursorWindowPos-FirstCursorWindowPos, Characters.GetMaxHeight(Text)-4};
             SDL_RenderFillRect(renderer, &SelectionBox);
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColorFloat(renderer, 1, 1, 1, Incrementpart);
+            SDL_SetRenderDrawColorFloat(renderer, Incrementpart, Incrementpart, Incrementpart, Incrementpart);
             SDL_RenderLine(renderer, SecondCursorWindowPos, charect.y+2, SecondCursorWindowPos, Characters.GetMaxHeight(Text)-1);
         }
         charect.x = Position.x - Characters.GetTotalLength(Text) * (((float)(Align+1))/2);
@@ -179,8 +179,9 @@ inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Character
             int LowerPos = (FirstCursorPos<SecondCursorPos)?FirstCursorPos:SecondCursorPos;
             int HigherPos = (FirstCursorPos>SecondCursorPos)?FirstCursorPos:SecondCursorPos;
             int NewPos = 0;
-            int BPNewSecondPos = -1;
-            if (InputChars == "/D"){
+            int ForceDifferentNewPos = -1;
+            bool NoNewPos = false;
+            if (InputChars.contains("/D")){
                 for (int i = 0; i < Text.length(); i++){
                     if (i < LowerPos || i >= HigherPos){
                         if (i+1 == LowerPos && i+1 == HigherPos){
@@ -197,13 +198,27 @@ inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Character
                     }
                 }
             }
-            elif (InputChars == "/L"){
-                NewPos = limit(LowerPos - 1, 0, Text.length());
+            elif (InputChars.contains("/L")){
+                if(InputChars.contains("/S")){
+                    ForceDifferentNewPos = SecondCursorPos - 1;
+                }
+                else{
+                    NewPos = limit(SecondCursorPos - 1, 0, Text.length());
+                }
                 NewText = Text;
             }
-            elif (InputChars == "/R"){
-                NewPos = limit(LowerPos + 1, 0, Text.length());
+            elif (InputChars.contains("/R")){
+                if(InputChars.contains("/S")){
+                    ForceDifferentNewPos = SecondCursorPos + 1;
+                }
+                else{
+                    NewPos = limit(SecondCursorPos + 1, 0, Text.length());
+                }
                 NewText = Text;
+            }
+            elif (InputChars.contains("/S")){
+                NewText = Text;
+                NoNewPos = true;
             }
             else{
                 for (int i = 0; i < Text.length(); i++){
@@ -220,15 +235,16 @@ inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Character
                     }
                 }
             }
-            FirstCursorPos = NewPos;
-            if (BPNewSecondPos == -1){
-                SecondCursorPos = NewPos;
-            }
-            else{
-                SecondCursorPos = BPNewSecondPos;
-            }
             Text = NewText;
-            Editing = false;
+            if (!NoNewPos){
+                if (ForceDifferentNewPos == -1){
+                    FirstCursorPos = limit(NewPos, 0, Text.length());
+                    SecondCursorPos = limit(NewPos, 0, Text.length());
+                }
+                else{
+                    SecondCursorPos = limit(ForceDifferentNewPos, 0, Text.length());
+                }
+            }
         }
         if (Align != Left){
             charect.x = Position.x - (Characters.GetTotalLength(Text) * (((float)(Align+1))/2));

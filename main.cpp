@@ -1,3 +1,5 @@
+#include "SDL3/SDL_keycode.h"
+#include "SDL3/SDL_scancode.h"
 #include "SDL3/SDL_video.h"
 #define _USE_MATH_DEFINES
 #include "TextHelp.hpp"
@@ -838,18 +840,19 @@ int main(int argc, char* argv[]) {
 
 
                     /* Delete */
+                    if (keystates[SDL_SCANCODE_LSHIFT]){
+                        Input = "/S";
+                    }
                     if (e.key.key == SDLK_DELETE || e.key.key == SDLK_BACKSPACE){
-                        Input = "/D";
+                        Input += "/D";
                     }
                     elif (e.key.key == SDLK_LEFT){
-                        Input = "/L";
+                        Input += "/L";
                     }
                     elif (e.key.key == SDLK_RIGHT){
-                        Input = "/R";
+                        Input += "/R";
                     }
                     break;
-
-
 
 
                 case SDL_EVENT_TEXT_INPUT:
