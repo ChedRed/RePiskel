@@ -1,3 +1,4 @@
+#include "SDL3/SDL_mouse.h"
 #define _USE_MATH_DEFINES
 #include "TextHelp.hpp"
 
@@ -1004,6 +1005,11 @@ int main(int argc, char* argv[]) {
                     }
                 }
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        }
+
+
+        if (mousebitmask & SDL_BUTTON_LMASK && Title.Selected){
+            Title.ConTrySelect(mouse, Characters);
         }
 
 

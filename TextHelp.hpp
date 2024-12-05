@@ -88,6 +88,7 @@ void Edit(std::string InputChars);
 void Edit();
 void Destroy();
 void TrySelect(Vector2 CursorPosition, TextCharacters Characters);
+void ConTrySelect(Vector2 CursorPosition, TextCharacters Characters);
 bool Editable;
 bool Selected = false;
 std::string Text;
@@ -110,27 +111,40 @@ inline TextObject::TextObject(const char * text, Alignment align, Vector2 positi
 
 
 inline void TextObject::TrySelect(Vector2 CursorPosition, TextCharacters Characters){
-    if (contained(CursorPosition, {Position.x - (Characters.GetTotalLength(Text)*((float)Align/2))-8, Position.y - (Characters.GetMaxHeight(Text)/2), Characters.GetTotalLength(Text)+16, Characters.GetMaxHeight(Text)})){
+    float BasePos = (Characters.GetTotalLength(Text)*((float)Align/2));
+    if (contained(CursorPosition, {Position.x - BasePos-8, Position.y - (Characters.GetMaxHeight(Text)/2), Characters.GetTotalLength(Text)+16, Characters.GetMaxHeight(Text)})){
         Selected = true;
         float distance = Characters.GetTotalLength(Text);
         for (int i = 0; i < Text.length()+1; i++){
-            if (CursorPosition.x - (Position.x - (Characters.GetTotalLength(Text)*((float)Align/2)) + Characters.GetTotalLength(slice(Text, 0, i))) > 0){
-                distance = abs(CursorPosition.x - (Position.x - (Characters.GetTotalLength(Text)*((float)Align/2)) + Characters.GetTotalLength(slice(Text, 0, i))));
+            if (CursorPosition.x > (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i)))){
+                distance = abs(CursorPosition.x - (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i))));
             }
             else{
-                Cursor = i-(distance < abs(CursorPosition.x - (Position.x - (Characters.GetTotalLength(Text)*((float)Align/2)) + Characters.GetTotalLength(slice(Text, 0, i)))));
+                Cursor = i-(distance < abs(CursorPosition.x - (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i)))));
                 Selection = 0;
                 break;
             }
             if (i == Text.length()-1) Cursor = i+1;
         }
+        return;
     }
     Selected = false;
 }
 
 
-inline void ContSelecText(Vector2 CursorPosition){
-
+inline void TextObject::ConTrySelect(Vector2 CursorPosition, TextCharacters Characters){
+    float BasePos = (Characters.GetTotalLength(Text)*((float)Align/2));
+    float distance = Characters.GetTotalLength(Text);
+    for (int i = 0; i < Text.length()+1; i++){
+        if (CursorPosition.x > (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i)))){
+            distance = abs(CursorPosition.x - (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i))));
+        }
+        else{
+            Selection = i-(distance < abs(CursorPosition.x - (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i))))) - Cursor;
+            break;
+        }
+        if (i == Text.length()-1) Selection = i+1 - Cursor;
+    }
 }
 
 
