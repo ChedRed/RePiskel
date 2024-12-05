@@ -1,4 +1,3 @@
-#include "MoreMaths.hpp"
 #define _USE_MATH_DEFINES
 #include "TextHelp.hpp"
 
@@ -758,7 +757,7 @@ int main(int argc, char* argv[]) {
                         }
                         SDL_SetRenderTarget(renderer, NULL);
                     }
-                    Title.CheckSelected(mouse, Characters);
+                    Title.TrySelect(mouse, Characters);
                     lastmouse = mouse;
                     break;
 

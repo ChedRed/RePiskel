@@ -87,9 +87,9 @@ void ShiftCursor(bool Shift, bool MoveLeft);
 void Edit(std::string InputChars);
 void Edit();
 void Destroy();
-bool CheckSelected(Vector2 CursorPosition, TextCharacters Characters);
+void TrySelect(Vector2 CursorPosition, TextCharacters Characters);
 bool Editable;
-bool Selected;
+bool Selected = false;
 std::string Text;
 Alignment Align;
 Vector2 Position;
@@ -109,7 +109,7 @@ inline TextObject::TextObject(const char * text, Alignment align, Vector2 positi
 }
 
 
-inline bool TextObject::CheckSelected(Vector2 CursorPosition, TextCharacters Characters){
+inline void TextObject::TrySelect(Vector2 CursorPosition, TextCharacters Characters){
     if (contained(CursorPosition, {Position.x - (Characters.GetTotalLength(Text)*((float)Align/2))-8, Position.y - (Characters.GetMaxHeight(Text)/2), Characters.GetTotalLength(Text)+16, Characters.GetMaxHeight(Text)})){
         Selected = true;
         float distance = Characters.GetTotalLength(Text);
@@ -124,10 +124,8 @@ inline bool TextObject::CheckSelected(Vector2 CursorPosition, TextCharacters Cha
             }
             if (i == Text.length()-1) Cursor = i+1;
         }
-        return true;
     }
     Selected = false;
-    return false;
 }
 
 
@@ -166,7 +164,7 @@ inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Character
     SDL_FRect charect;
     charect.x = Position.x - (Characters.GetTotalLength(Text)*((float)Align/2));
     charect.y = Position.y - Characters.GetMaxHeight(Text)/2;
-    if (Selected){
+    if (Selected && Editable){
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         if (Selection != 0){
             SDL_SetRenderDrawColor(renderer, 50, 50, 128, 128);
