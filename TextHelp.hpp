@@ -1,10 +1,13 @@
 #pragma once
 #include "MoreMaths.hpp"
+#include "SDL3/SDL_blendmode.h"
+#include "SDL3/SDL_render.h"
+#include "Vector2.hpp"
 
 typedef int Alignment;
-#define Left -1
-#define Center 0
-#define Right 1
+#define Left 0
+#define Center 1
+#define Right 2
 
 
 // Character cache
@@ -79,23 +82,20 @@ inline TTF_Font * TextCharacters::GetFont(){
 class TextObject{
 public:
 TextObject(const char * text, Alignment align, Vector2 position, bool editable);
-void Render(SDL_Renderer * renderer, TextCharacters Characters, float DeltaTime = 0, Vector2 CursorPosition = {0, 0}, bool LeftMouseState = false, bool OldLeftMouseState = false, std::string InputChars = "");
+void Render(SDL_Renderer * renderer, TextCharacters Characters);
+void ShiftCursor(bool Shift, bool MoveLeft);
+void Edit(std::string InputChars);
+void Edit();
 void Destroy();
+bool CheckSelected(Vector2 CursorPosition, TextCharacters Characters);
 bool Editable;
+bool Selected;
 std::string Text;
 Alignment Align;
 Vector2 Position;
 private:
-bool Editing;
-bool LastEditing;
-int FirstCursorPos;
-int SecondCursorPos;
-Vector2 InitialCursorPos;
-float FirstCursorWindowPos;
-float SecondCursorWindowPos;
-float Incrementime;
-float Incrementpart;
-Vector2 SelectionRange;
+int Cursor;
+int Selection;
 };
 
 
@@ -104,151 +104,82 @@ inline TextObject::TextObject(const char * text, Alignment align, Vector2 positi
     Align = align;
     Position = position;
     Editable = editable;
+    Cursor = -1;
+    Selection = 0;
 }
 
 
-inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Characters, float DeltaTime, Vector2 CursorPosition, bool LeftMouseState, bool OldLeftMouseState, std::string InputChars){
-    Incrementime += DeltaTime;
-    std::modf(Incrementime, &Incrementpart);
-    SDL_FRect charect = {Position.x, Position.y - (Characters.GetMaxHeight(Text)/2), 0, 0};
-    SDL_Texture * curchar;
-    if (Align != Left){
-        charect.x -= Characters.GetTotalLength(Text) * (((float)(Align+1))/2);
-    }
-
-
-    if (InputChars == ""){
-        InitialCursorPos = (LeftMouseState && !OldLeftMouseState)?CursorPosition:InitialCursorPos;
-        Editing = contained(InitialCursorPos, {charect.x-8, charect.y, Characters.GetTotalLength(Text)+16, Characters.GetMaxHeight(Text)}) && Editable;
-        for (int i = 0; i < Text.length(); i++){
-            curchar = Characters.GetCharacter(std::string() + Text[i]);
-            SDL_GetTextureSize(curchar, &charect.w, &charect.h);
-            if (LeftMouseState){
-                if (contained(CursorPosition, charect)){
-                    if (!OldLeftMouseState){
-                        FirstCursorPos = i+(CursorPosition.x-charect.x > charect.x+charect.w-CursorPosition.x);
-                    }
-                        SecondCursorPos = i+(CursorPosition.x-charect.x > charect.x+charect.w-CursorPosition.x);
-                }
-                elif (CursorPosition.x < charect.x || CursorPosition.y < charect.y){
-                    if (i == 0){
-                        if (!OldLeftMouseState) FirstCursorPos = 0;
-                        SecondCursorPos = 0;
-                    }
-                }
-                elif ((CursorPosition.x > charect.x + charect.w || CursorPosition.y > charect.y + charect.h)){
-                    if (i == Text.length()-1){
-                        if (!OldLeftMouseState) FirstCursorPos = i+1;
-                        SecondCursorPos = i+1;
-                    }
-                }
-            }
-            if (Editing){
-                if (FirstCursorPos == i){
-                    FirstCursorWindowPos = charect.x;
-                }
-                elif (FirstCursorPos == i+1){
-                    FirstCursorWindowPos = charect.x+charect.w;
-                }
-                if (SecondCursorPos == i){
-                    SecondCursorWindowPos = charect.x;
-                }
-                elif (SecondCursorPos == i+1){
-                    SecondCursorWindowPos = charect.x+charect.w;
-                }
-            }
-            charect.x += charect.w - ((std::string() + Text[i]=="k" && std::string() + Text[i+1]=="e")?1:0);
-        }
-
-
-
-        if (Editing && LastEditing){
-            SelectionRange = Vector2(FirstCursorPos, SecondCursorPos);
-            SDL_SetRenderDrawColor(renderer, 20, 20, 50, 255);
-            SDL_FRect SelectionBox = {FirstCursorWindowPos, charect.y+2, SecondCursorWindowPos-FirstCursorWindowPos, Characters.GetMaxHeight(Text)-4};
-            SDL_RenderFillRect(renderer, &SelectionBox);
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColorFloat(renderer, Incrementpart, Incrementpart, Incrementpart, Incrementpart);
-            SDL_RenderLine(renderer, SecondCursorWindowPos, charect.y+2, SecondCursorWindowPos, Characters.GetMaxHeight(Text)-1);
-        }
-        charect.x = Position.x - Characters.GetTotalLength(Text) * (((float)(Align+1))/2);
-    }
-    else{
-        if (Editing){
-            std::string NewText = "";
-            int LowerPos = (FirstCursorPos<SecondCursorPos)?FirstCursorPos:SecondCursorPos;
-            int HigherPos = (FirstCursorPos>SecondCursorPos)?FirstCursorPos:SecondCursorPos;
-            int NewPos = 0;
-            int ForceDifferentNewPos = -1;
-            bool NoNewPos = false;
-            if (InputChars.contains("/D")){
-                for (int i = 0; i < Text.length(); i++){
-                    if (i < LowerPos || i >= HigherPos){
-                        if (i+1 == LowerPos && i+1 == HigherPos){
-                            NewPos = i;
-                        }
-                        else{
-                            NewText += Text[i];
-                        }
-                    }
-                    else{
-                        if (i == LowerPos){
-                            NewPos = i;
-                        }
-                    }
-                }
-            }
-            elif (InputChars.contains("/L")){
-                if(InputChars.contains("/S")){
-                    ForceDifferentNewPos = SecondCursorPos - 1;
-                }
-                else{
-                    NewPos = limit(SecondCursorPos - 1, 0, Text.length());
-                }
-                NewText = Text;
-            }
-            elif (InputChars.contains("/R")){
-                if(InputChars.contains("/S")){
-                    ForceDifferentNewPos = SecondCursorPos + 1;
-                }
-                else{
-                    NewPos = limit(SecondCursorPos + 1, 0, Text.length());
-                }
-                NewText = Text;
-            }
-            elif (InputChars.contains("/S")){
-                NewText = Text;
-                NoNewPos = true;
+inline bool TextObject::CheckSelected(Vector2 CursorPosition, TextCharacters Characters){
+    if (contained(CursorPosition, {Position.x - (Characters.GetTotalLength(Text)*((float)Align/2))-8, Position.y - (Characters.GetMaxHeight(Text)/2), Characters.GetTotalLength(Text)+16, Characters.GetMaxHeight(Text)})){
+        Selected = true;
+        float distance = Characters.GetTotalLength(Text);
+        for (int i = 0; i < Text.length()+1; i++){
+            if (CursorPosition.x - (Position.x - (Characters.GetTotalLength(Text)*((float)Align/2)) + Characters.GetTotalLength(slice(Text, 0, i))) > 0){
+                distance = abs(CursorPosition.x - (Position.x - (Characters.GetTotalLength(Text)*((float)Align/2)) + Characters.GetTotalLength(slice(Text, 0, i))));
             }
             else{
-                for (int i = 0; i < Text.length(); i++){
-                    if (i < LowerPos || i >= HigherPos){
-                        NewText += Text[i];
-                        if (i+1 == LowerPos && i+1 == HigherPos){
-                            NewText += InputChars;
-                            NewPos = i+2;
-                        }
-                    }
-                    elif (i == LowerPos){
-                        NewText += InputChars;
-                        NewPos = i+1;
-                    }
-                }
+                Cursor = i-(distance < abs(CursorPosition.x - (Position.x - (Characters.GetTotalLength(Text)*((float)Align/2)) + Characters.GetTotalLength(slice(Text, 0, i)))));
+                Selection = 0;
+                break;
             }
-            Text = NewText;
-            if (!NoNewPos){
-                if (ForceDifferentNewPos == -1){
-                    FirstCursorPos = limit(NewPos, 0, Text.length());
-                    SecondCursorPos = limit(NewPos, 0, Text.length());
-                }
-                else{
-                    SecondCursorPos = limit(ForceDifferentNewPos, 0, Text.length());
-                }
-            }
+            if (i == Text.length()-1) Cursor = i+1;
         }
-        if (Align != Left){
-            charect.x = Position.x - (Characters.GetTotalLength(Text) * (((float)(Align+1))/2));
+        return true;
+    }
+    Selected = false;
+    return false;
+}
+
+
+inline void ContSelecText(Vector2 CursorPosition){
+
+}
+
+
+inline void TextObject::ShiftCursor(bool Shift, bool MoveLeft){
+    if (Selected){
+        if (Shift){
+            Selection -= (MoveLeft-0.5)*2;
+            Selection = limit(Selection, -Cursor, Text.length()-Cursor);
         }
+        else{
+            Cursor -= (MoveLeft-0.5)*2 - Selection;
+            Selection = 0;
+        }
+    }
+    Cursor = limit(Cursor, 0, Text.length());
+}
+
+
+inline void TextObject::Edit(std::string InputChars){
+
+}
+
+
+inline void TextObject::Edit(){
+
+}
+
+
+inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Characters){
+    SDL_Texture * curchar;
+    SDL_FRect charect;
+    charect.x = Position.x - (Characters.GetTotalLength(Text)*((float)Align/2));
+    charect.y = Position.y - Characters.GetMaxHeight(Text)/2;
+    if (Selected){
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        if (Selection != 0){
+            SDL_SetRenderDrawColor(renderer, 50, 50, 128, 128);
+            SDL_FRect SelecRect = {charect.x+Characters.GetTotalLength(slice(Text, 0, Cursor + Selection)), charect.y, ((Selection>0)?-1:1)*Characters.GetTotalLength(slice(Text, ((Selection<0)?Cursor+Selection:Cursor), ((Selection>0)?Cursor+Selection:Cursor))), Characters.GetMaxHeight(Text)};
+            SDL_RenderFillRect(renderer, &SelecRect);
+        }
+
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_RenderLine(renderer, charect.x+Characters.GetTotalLength(slice(Text, 0, Cursor + Selection)), charect.y, charect.x+Characters.GetTotalLength(slice(Text, 0, Cursor + Selection)), charect.y+Characters.GetMaxHeight(Text)-1);
+    }
+    else {
+        Cursor = -1;
+        Selection = 0;
     }
     for (int i = 0; i < Text.length(); i++){
         curchar = Characters.GetCharacter(std::string() + Text[i]);
@@ -256,5 +187,4 @@ inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Character
         SDL_RenderTexture(renderer, curchar, NULL, &charect);
         charect.x += charect.w - ((std::string() + Text[i]=="k" && std::string() + Text[i+1]=="e")?1:0);
     }
-    LastEditing = Editing;
 }

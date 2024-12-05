@@ -1,3 +1,4 @@
+#include "MoreMaths.hpp"
 #define _USE_MATH_DEFINES
 #include "TextHelp.hpp"
 
@@ -757,6 +758,7 @@ int main(int argc, char* argv[]) {
                         }
                         SDL_SetRenderTarget(renderer, NULL);
                     }
+                    Title.CheckSelected(mouse, Characters);
                     lastmouse = mouse;
                     break;
 
@@ -842,24 +844,21 @@ int main(int argc, char* argv[]) {
                     }
 
 
-                    /* Delete */
-                    if (keystates[SDL_SCANCODE_LSHIFT]){
-                        Input = "/S";
-                    }
+                    /* Change title text */
                     if (e.key.key == SDLK_DELETE || e.key.key == SDLK_BACKSPACE){
-                        Input += "/D";
+                        Title.Edit();
                     }
-                    elif (e.key.key == SDLK_LEFT){
-                        Input += "/L";
+                    if (e.key.key == SDLK_LEFT){
+                        Title.ShiftCursor(keystates[SDL_SCANCODE_LSHIFT], true);
                     }
                     elif (e.key.key == SDLK_RIGHT){
-                        Input += "/R";
+                        Title.ShiftCursor(keystates[SDL_SCANCODE_LSHIFT], false);
                     }
                     break;
 
 
                 case SDL_EVENT_TEXT_INPUT:
-                    Input = e.text.text;
+                    Title.Edit(e.text.text);
                     break;
             }
         }
@@ -1152,7 +1151,7 @@ int main(int argc, char* argv[]) {
 
         /* Render UI text */
         CurSizeText.Render(renderer, Characters);
-        Title.Render(renderer, Characters, deltime, mouse, mousebitmask & SDL_BUTTON_LMASK, oldmousedown, Input);
+        Title.Render(renderer, Characters);
 
 
         /* Push render content */
