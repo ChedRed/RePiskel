@@ -1,6 +1,6 @@
-#include "SDL3/SDL_mouse.h"
-#define _USE_MATH_DEFINES
-#include "TextHelp.hpp"
+#include "IncAll.hpp"
+#include "SDL3/SDL_video.h"
+#include "SDL3_ttf/SDL_ttf.h"
 
 
 /*
@@ -301,16 +301,9 @@ int main(int argc, char* argv[]) {
     /* Initialize SDL_ttf, create font object */
     TTF_Init();
     TTF_Font * font = TTF_OpenFont((SDL_GetBasePath()+rpath+"Font.ttf").c_str(), 26);
-    // int kerning;
-    // TTF_Font * TTfont = TTF_OpenFont((SDL_GetBasePath()+rpath+"Font.ttf").c_str(), 260);
-    // TTF_GetGlyphKerning(TTfont, 107, 101, &kerning);
+    int kerning;
+    TTF_GetGlyphKerning(font, (int)'A', (int)'V', &kerning);
     // SDL_SetWindowTitle(window, std::to_string(kerning).c_str());
-    // SDL_Surface * tempsurface = TTF_RenderText_Blended(font, "New Piskel", 10, {255, 255, 255, 255});
-    // SDL_Texture * tempthisthat = SDL_CreateTextureFromSurface(renderer, tempsurface);
-    // SDL_DestroySurface(tempsurface);
-    // SDL_FRect tempthisthatrect = {0, 0, 0, 0};
-    // SDL_GetTextureSize(tempthisthat, &tempthisthatrect.w, &tempthisthatrect.h);
-    // tempthisthatrect = {((float)windowsize.x/2)-(tempthisthatrect.w/2), 18-(tempthisthatrect.h/2), tempthisthatrect.w, tempthisthatrect.h};
 
 
     /* Init text assistant :) */
@@ -318,8 +311,8 @@ int main(int argc, char* argv[]) {
 
 
     /* Create text objects */
-    TextObject Title = {"New Piskel", Center, Vector2(windowsize.x/2, 18), true};
-    TextObject CurSizeText = {"1x", Center, Vector2(cursizerectborder.x/2, (cursizerectborder.y+cursizerectborder.h)), false};
+    TextObject Title = {"New Piskel", Center, Vector2(windowsize.x/2, 18), true, true};
+    TextObject CurSizeText = {"1x", Center, Vector2(cursizerectborder.x/2, (cursizerectborder.y+cursizerectborder.h)), false, true};
 
 
     /* Load textures */
@@ -454,7 +447,7 @@ int main(int argc, char* argv[]) {
     SDL_SetTextureScaleMode(rightcolorselector, SDL_SCALEMODE_NEAREST);
     SDL_GetTextureSize(presprite, &spriterect.w, &spriterect.h);
     spriterect = (SDL_FRect){0, 0, spriterect.w, spriterect.h };
-    CurSizeText.Position = Vector2(cursizerectborder.x+(cursizerectborder.w/2), cursizerectborder.y+cursizerectborder.h-(Characters.GetMaxHeight(CurSizeText.Text)/2));
+    CurSizeText.Position = Vector2(cursizerectborder.x+(cursizerectborder.w/2), cursizerectborder.y+cursizerectborder.h-((float)TTF_GetFontHeight(Characters.GetFont())/2));
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
 
@@ -846,13 +839,13 @@ int main(int argc, char* argv[]) {
 
                     /* Change title text */
                     if (e.key.key == SDLK_DELETE || e.key.key == SDLK_BACKSPACE){
-                        Title.Edit();
+                        Title.Delete(e.key.key == SDLK_DELETE);
                     }
                     if (e.key.key == SDLK_LEFT){
-                        Title.ShiftCursor(keystates[SDL_SCANCODE_LSHIFT], true);
+                        Title.MoveCursor(keystates[SDL_SCANCODE_LSHIFT] || keystates[SDL_SCANCODE_RSHIFT], keystates[SDL_SCANCODE_LCTRL] || keystates[SDL_SCANCODE_RCTRL], true);
                     }
                     elif (e.key.key == SDLK_RIGHT){
-                        Title.ShiftCursor(keystates[SDL_SCANCODE_LSHIFT], false);
+                        Title.MoveCursor(keystates[SDL_SCANCODE_LSHIFT] || keystates[SDL_SCANCODE_RSHIFT], keystates[SDL_SCANCODE_LCTRL] || keystates[SDL_SCANCODE_RCTRL], false);
                     }
                     break;
 
@@ -1076,13 +1069,13 @@ int main(int argc, char* argv[]) {
         SDL_RenderFillRect(renderer, &nameborder);
 
 
-        /* Render UI */
-        SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
+        /* Render UI */ //FIX!1!////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         if (contained(mouse, toolsrect) && toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)] != "") {
+            SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
             toolselectedrect = (SDL_FRect){(float)((int)((mouse.x-toolsrect.x)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.x, (float)((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.y, toolselectedrect.w, toolselectedrect.h };
             SDL_RenderFillRect(renderer, &toolselectedrect);
         }
-        toolshoveredrect.x=(currentool%3)*(toolsrect.w/3)+toolsrect.x;
+        toolshoveredrect.x=(currentool%3)*((toolsrect.w)/3)+toolsrect.x;
         toolshoveredrect.y=((int)(currentool/3))*(toolsrect.w/3)+toolsrect.y;
         SDL_RenderTexture(renderer, toolsborder, NULL, &toolshoveredrect);
         SDL_RenderTexture(renderer, tools, NULL, &toolsrect);
@@ -1157,6 +1150,7 @@ int main(int argc, char* argv[]) {
         /* Render UI text */
         CurSizeText.Render(renderer, Characters);
         Title.Render(renderer, Characters);
+        SDL_SetWindowTitle(window, ("RePiskel - " + Title.Text).c_str());
 
 
         /* Push render content */

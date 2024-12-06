@@ -1,6 +1,5 @@
 #pragma once
-#include "IncAll.h"
-#include <cmath>
+#include "IncAll.hpp"
 
 class Vector2{
 float magnitude;

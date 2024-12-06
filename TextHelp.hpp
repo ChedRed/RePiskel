@@ -1,8 +1,6 @@
 #pragma once
-#include "MoreMaths.hpp"
-#include "SDL3/SDL_blendmode.h"
-#include "SDL3/SDL_render.h"
-#include "Vector2.hpp"
+#include "IncAll.hpp"
+#include "SDL3_ttf/SDL_ttf.h"
 
 typedef int Alignment;
 #define Left 0
@@ -17,7 +15,6 @@ TextCharacters(SDL_Renderer * renderer, TTF_Font * font, std::string characters)
 SDL_Renderer * GetRenderer();
 SDL_Texture * GetCharacter(std::string character);
 float GetTotalLength(std::string characters);
-float GetMaxHeight(std::string characters);
 TTF_Font * GetFont();
 private:
 TTF_Font * Font;
@@ -49,22 +46,13 @@ inline SDL_Texture * TextCharacters::GetCharacter(std::string character){
 inline float TextCharacters::GetTotalLength(std::string characters){
     float value = 0;
     float addvalue = 0;
+    int kerning;
     for (int i = 0; i < characters.length(); i++){
         SDL_GetTextureSize(Characters[Charin.find(characters[i])], &addvalue, nullptr);
-        value += addvalue;
+        TTF_GetGlyphKerning(GetFont(), (int)characters[i], (int)characters[i+1], &kerning);
+        value += addvalue + kerning;
     }
     return value;
-}
-
-
-inline float TextCharacters::GetMaxHeight(std::string characters){
-    float value = 0;
-    float highest = 0;
-    for (int i = 0; i < characters.length(); i++){
-        SDL_GetTextureSize(Characters[Charin.find(characters[i])], nullptr, &value);
-        highest = (value>highest)?value:highest;
-    }
-    return highest;
 }
 
 
@@ -81,15 +69,16 @@ inline TTF_Font * TextCharacters::GetFont(){
 // Actual object to render text
 class TextObject{
 public:
-TextObject(const char * text, Alignment align, Vector2 position, bool editable);
+TextObject(const char * text, Alignment align, Vector2 position, bool editable, bool visibleWhenEmpty);
 void Render(SDL_Renderer * renderer, TextCharacters Characters);
-void ShiftCursor(bool Shift, bool MoveLeft);
+void MoveCursor(bool Shift, bool Control, bool MoveLeft);
 void Edit(std::string InputChars);
-void Edit();
+void Delete(bool Reverse);
 void Destroy();
 void TrySelect(Vector2 CursorPosition, TextCharacters Characters);
 void ConTrySelect(Vector2 CursorPosition, TextCharacters Characters);
 bool Editable;
+bool VisibleWhenEmpty;
 bool Selected = false;
 std::string Text;
 Alignment Align;
@@ -100,19 +89,24 @@ int Selection;
 };
 
 
-inline TextObject::TextObject(const char * text, Alignment align, Vector2 position, bool editable){
+inline TextObject::TextObject(const char * text, Alignment align, Vector2 position, bool editable, bool visibleWhenEmpty){
     Text = text;
     Align = align;
     Position = position;
     Editable = editable;
+    VisibleWhenEmpty = visibleWhenEmpty;
     Cursor = -1;
     Selection = 0;
 }
 
 
 inline void TextObject::TrySelect(Vector2 CursorPosition, TextCharacters Characters){
+    float FontHeight = (float)TTF_GetFontHeight(Characters.GetFont());
     float BasePos = (Characters.GetTotalLength(Text)*((float)Align/2));
-    if (contained(CursorPosition, {Position.x - BasePos-8, Position.y - (Characters.GetMaxHeight(Text)/2), Characters.GetTotalLength(Text)+16, Characters.GetMaxHeight(Text)})){
+    SDL_FRect TestRange = {Position.x - BasePos-8, Position.y - (FontHeight/2), Characters.GetTotalLength(Text)+16, FontHeight};
+    if (Text.length() == 0) TestRange = {Position.x - 8, Position.y - 8, 16, 16};
+    if (contained(CursorPosition, TestRange)){
+        Cursor = 0;
         Selected = true;
         float distance = Characters.GetTotalLength(Text);
         for (int i = 0; i < Text.length()+1; i++){
@@ -126,9 +120,10 @@ inline void TextObject::TrySelect(Vector2 CursorPosition, TextCharacters Charact
             }
             if (i == Text.length()-1) Cursor = i+1;
         }
-        return;
     }
-    Selected = false;
+    else{
+        Selected = false;
+    }
 }
 
 
@@ -148,7 +143,8 @@ inline void TextObject::ConTrySelect(Vector2 CursorPosition, TextCharacters Char
 }
 
 
-inline void TextObject::ShiftCursor(bool Shift, bool MoveLeft){
+// Modifiers in the order: Shift, Control, Alt/Option, Win/Command/Super.
+inline void TextObject::MoveCursor(bool Shift, bool Control, bool MoveLeft){
     if (Selected){
         if (Shift){
             Selection -= (MoveLeft-0.5)*2;
@@ -159,44 +155,82 @@ inline void TextObject::ShiftCursor(bool Shift, bool MoveLeft){
             Selection = 0;
         }
     }
-    Cursor = limit(Cursor, 0, Text.length());
 }
 
 
 inline void TextObject::Edit(std::string InputChars){
-
+    if (Selected){
+        if (Selection == 0){
+            Text = slice(Text, 0, Cursor)+InputChars+slice(Text, Cursor, Text.length());
+            Cursor++;
+        }
+        else{
+            Text = slice(Text, 0, (Selection<0)?Cursor+Selection:Cursor)+InputChars+slice(Text, (Selection>0)?Cursor+Selection:Cursor, Text.length());
+            Cursor = (Selection<0)?Cursor+Selection+InputChars.length():Cursor+InputChars.length();
+            Selection = 0;
+        }
+    }
 }
 
 
-inline void TextObject::Edit(){
-
+inline void TextObject::Delete(bool Reverse){
+    if (Selected){
+        if (Selection == 0){
+            if (Reverse){
+                Text = slice(Text, 0, Cursor)+slice(Text, Cursor+1, Text.length());
+            }
+            else{
+                Text = slice(Text, 0, Cursor-1)+slice(Text, Cursor, Text.length());
+                Cursor--;
+            }
+        }
+        else{
+            Text = slice(Text, 0, (Selection<0)?Cursor+Selection:Cursor)+slice(Text, (Selection>0)?Cursor+Selection:Cursor, Text.length());
+            Cursor = (Selection<0)?Cursor+Selection:Cursor;
+            Selection = 0;
+        }
+    }
 }
 
 
 inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Characters){
+    float FontHeight = (float)TTF_GetFontHeight(Characters.GetFont());
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_Texture * curchar;
     SDL_FRect charect;
     charect.x = Position.x - (Characters.GetTotalLength(Text)*((float)Align/2));
-    charect.y = Position.y - Characters.GetMaxHeight(Text)/2;
+    charect.y = Position.y - FontHeight/2;
     if (Selected && Editable){
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        if (Selection != 0){
-            SDL_SetRenderDrawColor(renderer, 50, 50, 128, 128);
-            SDL_FRect SelecRect = {charect.x+Characters.GetTotalLength(slice(Text, 0, Cursor + Selection)), charect.y, ((Selection>0)?-1:1)*Characters.GetTotalLength(slice(Text, ((Selection<0)?Cursor+Selection:Cursor), ((Selection>0)?Cursor+Selection:Cursor))), Characters.GetMaxHeight(Text)};
-            SDL_RenderFillRect(renderer, &SelecRect);
+        Cursor = limit(Cursor, 0, Text.length());
+        if (Text.length() == 0){
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL_RenderLine(renderer, Position.x, Position.y - (FontHeight/4), Position.x, Position.y + (FontHeight/4));
         }
-
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        SDL_RenderLine(renderer, charect.x+Characters.GetTotalLength(slice(Text, 0, Cursor + Selection)), charect.y, charect.x+Characters.GetTotalLength(slice(Text, 0, Cursor + Selection)), charect.y+Characters.GetMaxHeight(Text)-1);
+        else{
+            if (Selection != 0){
+                SDL_SetRenderDrawColor(renderer, 50, 50, 128, 128);
+                SDL_FRect SelecRect = {charect.x+Characters.GetTotalLength(slice(Text, 0, Cursor + Selection)), charect.y, ((Selection>0)?-1:1)*Characters.GetTotalLength(slice(Text, ((Selection<0)?Cursor+Selection:Cursor), ((Selection>0)?Cursor+Selection:Cursor))), FontHeight+1};
+                SDL_RenderFillRect(renderer, &SelecRect);
+            }
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL_RenderLine(renderer, charect.x+Characters.GetTotalLength(slice(Text, 0, Cursor + Selection)), charect.y, charect.x+Characters.GetTotalLength(slice(Text, 0, Cursor + Selection)), charect.y+FontHeight);
+        }
     }
-    else {
+    else{
+        if (Text.length() == 0 && VisibleWhenEmpty){
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 64);
+            SDL_FRect TempRectForFillWhyDoesItNeedAPointerThatsSoSillyAndStupidButIGuessItMakesSenseConsideringYouDontWantToConstantlyCopyDataLikeIDoAllTheTimeInMyCPPProgramsOopsiesLol = {Position.x - (FontHeight/4), Position.y - (FontHeight/4), FontHeight/2, FontHeight/2};
+            SDL_RenderFillRect(renderer, &TempRectForFillWhyDoesItNeedAPointerThatsSoSillyAndStupidButIGuessItMakesSenseConsideringYouDontWantToConstantlyCopyDataLikeIDoAllTheTimeInMyCPPProgramsOopsiesLol);
+        }
         Cursor = -1;
         Selection = 0;
     }
+    int kerning;
     for (int i = 0; i < Text.length(); i++){
         curchar = Characters.GetCharacter(std::string() + Text[i]);
         SDL_GetTextureSize(curchar, &charect.w, &charect.h);
         SDL_RenderTexture(renderer, curchar, NULL, &charect);
-        charect.x += charect.w - ((std::string() + Text[i]=="k" && std::string() + Text[i+1]=="e")?1:0);
+        TTF_GetGlyphKerning(Characters.GetFont(), (int)Text[i], (int)Text[i+1], &kerning);
+        charect.x += charect.w + kerning;
     }
 }
