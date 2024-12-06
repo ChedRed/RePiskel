@@ -1,4 +1,5 @@
 #include "IncAll.hpp"
+#include "SDL3/SDL_keycode.h"
 #include "SDL3/SDL_video.h"
 #include "SDL3_ttf/SDL_ttf.h"
 
@@ -301,9 +302,10 @@ int main(int argc, char* argv[]) {
     /* Initialize SDL_ttf, create font object */
     TTF_Init();
     TTF_Font * font = TTF_OpenFont((SDL_GetBasePath()+rpath+"Font.ttf").c_str(), 26);
-    int kerning;
-    TTF_GetGlyphKerning(font, (int)'A', (int)'V', &kerning);
+    // int kerning;
+    // TTF_GetGlyphKerning(font, (int)'k', (int)'e', &kerning);
     // SDL_SetWindowTitle(window, std::to_string(kerning).c_str());
+    // std::cout << kerning << std::endl;
 
 
     /* Init text assistant :) */
@@ -820,6 +822,18 @@ int main(int argc, char* argv[]) {
                                 }
                             }
                         }
+                        elif (e.key.key == SDLK_A){
+                            Title.Edit("a", keystates[SDL_MODKEY]);
+                        }
+                        elif (e.key.key == SDLK_C){
+                            Title.Edit("c", keystates[SDL_MODKEY]);
+                        }
+                        elif (e.key.key == SDLK_X){
+                            Title.Edit("x", keystates[SDL_MODKEY]);
+                        }
+                        elif (e.key.key == SDLK_V){
+                            Title.Edit("v", keystates[SDL_MODKEY]);
+                        }
                     }
 
 
@@ -851,7 +865,7 @@ int main(int argc, char* argv[]) {
 
 
                 case SDL_EVENT_TEXT_INPUT:
-                    Title.Edit(e.text.text);
+                    Title.Edit(e.text.text, false);
                     break;
             }
         }

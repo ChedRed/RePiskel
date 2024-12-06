@@ -1,6 +1,6 @@
 #pragma once
 #include "IncAll.hpp"
-#include "SDL3_ttf/SDL_ttf.h"
+#define elif else if
 
 typedef int Alignment;
 #define Left 0
@@ -72,7 +72,7 @@ public:
 TextObject(const char * text, Alignment align, Vector2 position, bool editable, bool visibleWhenEmpty);
 void Render(SDL_Renderer * renderer, TextCharacters Characters);
 void MoveCursor(bool Shift, bool Control, bool MoveLeft);
-void Edit(std::string InputChars);
+void Edit(std::string InputChars, bool Modifier);
 void Delete(bool Reverse);
 void Destroy();
 void TrySelect(Vector2 CursorPosition, TextCharacters Characters);
@@ -143,7 +143,6 @@ inline void TextObject::ConTrySelect(Vector2 CursorPosition, TextCharacters Char
 }
 
 
-// Modifiers in the order: Shift, Control, Alt/Option, Win/Command/Super.
 inline void TextObject::MoveCursor(bool Shift, bool Control, bool MoveLeft){
     if (Selected){
         if (Shift){
@@ -158,16 +157,37 @@ inline void TextObject::MoveCursor(bool Shift, bool Control, bool MoveLeft){
 }
 
 
-inline void TextObject::Edit(std::string InputChars){
+inline void TextObject::Edit(std::string InputChars, bool Modifier){
     if (Selected){
-        if (Selection == 0){
-            Text = slice(Text, 0, Cursor)+InputChars+slice(Text, Cursor, Text.length());
-            Cursor++;
+        if (Modifier){
+            if (InputChars == "a"){
+                Cursor = 0;
+                Selection = Text.length();
+            }
+            elif (InputChars == "c"){
+                SDL_SetClipboardText(slice(Text, (Selection<0)?Cursor+Selection:Cursor, (Selection>0)?Cursor+Selection:Cursor).c_str());
+                std::cout << SDL_GetClipboardText() << std::endl;
+            }
+            elif (InputChars == "x"){
+                if (Selection != 0){
+                    SDL_SetClipboardText(slice(Text, (Selection<0)?Cursor+Selection:Cursor, (Selection>0)?Cursor+Selection:Cursor).c_str());
+                    Delete(false);
+                }
+            }
+            elif (InputChars == "v"){
+                Edit(SDL_GetClipboardText(), false);
+            }
         }
         else{
-            Text = slice(Text, 0, (Selection<0)?Cursor+Selection:Cursor)+InputChars+slice(Text, (Selection>0)?Cursor+Selection:Cursor, Text.length());
-            Cursor = (Selection<0)?Cursor+Selection+InputChars.length():Cursor+InputChars.length();
-            Selection = 0;
+            if (Selection == 0){
+                Text = slice(Text, 0, Cursor)+InputChars+slice(Text, Cursor, Text.length());
+                Cursor+=InputChars.length();
+            }
+            else{
+                Text = slice(Text, 0, (Selection<0)?Cursor+Selection:Cursor)+InputChars+slice(Text, (Selection>0)?Cursor+Selection:Cursor, Text.length());
+                Cursor = (Selection<0)?Cursor+Selection+InputChars.length():Cursor+InputChars.length();
+                Selection = 0;
+            }
         }
     }
 }
