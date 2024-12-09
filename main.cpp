@@ -840,16 +840,16 @@ int main(int argc, char* argv[]) {
                             }
                         }
                         elif (e.key.key == SDLK_A){
-                            Title.Edit("a", keystates[SDL_MODKEY]);
+                            Title.Edit("a", keystates[SDL_MODKEY], Characters);
                         }
                         elif (e.key.key == SDLK_C){
-                            Title.Edit("c", keystates[SDL_MODKEY]);
+                            Title.Edit("c", keystates[SDL_MODKEY], Characters);
                         }
                         elif (e.key.key == SDLK_X){
-                            Title.Edit("x", keystates[SDL_MODKEY]);
+                            Title.Edit("x", keystates[SDL_MODKEY], Characters);
                         }
                         elif (e.key.key == SDLK_V){
-                            Title.Edit("v", keystates[SDL_MODKEY]);
+                            Title.Edit("v", keystates[SDL_MODKEY], Characters);
                         }
                     }
 
@@ -888,7 +888,7 @@ int main(int argc, char* argv[]) {
 
 
                 case SDL_EVENT_TEXT_INPUT:
-                    Title.Edit(e.text.text, false);
+                    Title.Edit(e.text.text, false, Characters);
                     break;
             }
         }

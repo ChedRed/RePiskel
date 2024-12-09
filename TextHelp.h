@@ -20,6 +20,7 @@ TextCharacters(SDL_Renderer * renderer, TTF_Font * font, std::string characters)
 SDL_Renderer * GetRenderer();
 SDL_Texture * GetCharacter(std::string character);
 float GetTotalLength(std::string characters);
+std::string KeepValid(std::string value);
 TTF_Font * GetFont();
 private:
 TTF_Font * Font;
@@ -61,6 +62,15 @@ inline float TextCharacters::GetTotalLength(std::string characters){
 }
 
 
+inline std::string TextCharacters::KeepValid(std::string value){
+    std::string returnv = "";
+    for (int i = 0; i < value.length(); i++){
+        if (Charin.find(value[i]) != std::string::npos) returnv += value[i];
+    }
+    return returnv;
+}
+
+
 inline SDL_Renderer * TextCharacters::GetRenderer(){
     return Renderer;
 }
@@ -77,7 +87,7 @@ public:
 TextObject(std::string text, Alignment align, Vector2 position, bool editable, bool visibleWhenEmpty);
 void Render(SDL_Renderer * renderer, TextCharacters Characters);
 void MoveCursor(bool Shift, bool Control, bool MoveLeft);
-void Edit(std::string InputChars, bool Modifier);
+void Edit(std::string InputChars, bool Modifier, TextCharacters Characters);
 void Delete(bool Reverse);
 void Destroy();
 void TrySelect(Vector2 CursorPosition, bool Shift, TextCharacters Characters);
@@ -177,7 +187,9 @@ inline void TextObject::MoveCursor(bool Shift, bool Control, bool MoveLeft){
 }
 
 
-inline void TextObject::Edit(std::string InputChars, bool Modifier){
+inline void TextObject::Edit(std::string InputChars, bool Modifier, TextCharacters Characters){
+    InputChars = Characters.KeepValid(InputChars);
+    if (InputChars == "") return;
     if (Selected){
         if (Modifier){
             if (InputChars == "a"){
@@ -194,7 +206,7 @@ inline void TextObject::Edit(std::string InputChars, bool Modifier){
                 }
             }
             elif (InputChars == "v"){
-                Edit(SDL_GetClipboardText(), false);
+                Edit(SDL_GetClipboardText(), false, Characters);
             }
         }
         else{
