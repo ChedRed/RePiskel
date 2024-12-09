@@ -1,5 +1,8 @@
 #pragma once
-#include "Vector2.hpp"
+#include <string>
+#include <optional>
+#include <SDL3/SDL.h>
+#include "Vector2.h"
 
 /* Interpolation function */
 inline double lerp(double a, double b, double c){ return a+((b-a)*c); }

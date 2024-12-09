@@ -1,16 +1,16 @@
 #pragma once
-#include "IncAll.hpp"
+#include <cmath>
 
 class Vector2{
 float magnitude;
 public:
-Vector2(int X = 0, int Y = 0);
+Vector2(float X = 0, float Y = 0);
 float Magnitude();
 float x;
 float y;
 };
 
-inline Vector2::Vector2(int X, int Y){
+inline Vector2::Vector2(float X, float Y){
     x = X;
     y = Y;
 }

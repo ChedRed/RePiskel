@@ -1,5 +1,10 @@
 #pragma once
-#include "IncAll.hpp"
+#include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
+#include <string>
+#include <vector>
+#include "Vector2.h"
+#include "MoreMaths.h"
 #define elif else if
 
 typedef int Alignment;
@@ -69,13 +74,13 @@ inline TTF_Font * TextCharacters::GetFont(){
 // Actual object to render text
 class TextObject{
 public:
-TextObject(const char * text, Alignment align, Vector2 position, bool editable, bool visibleWhenEmpty);
+TextObject(std::string text, Alignment align, Vector2 position, bool editable, bool visibleWhenEmpty);
 void Render(SDL_Renderer * renderer, TextCharacters Characters);
 void MoveCursor(bool Shift, bool Control, bool MoveLeft);
 void Edit(std::string InputChars, bool Modifier);
 void Delete(bool Reverse);
 void Destroy();
-void TrySelect(Vector2 CursorPosition, TextCharacters Characters);
+void TrySelect(Vector2 CursorPosition, bool Shift, TextCharacters Characters);
 void ConTrySelect(Vector2 CursorPosition, TextCharacters Characters);
 bool Editable;
 bool VisibleWhenEmpty;
@@ -89,7 +94,7 @@ int Selection;
 };
 
 
-inline TextObject::TextObject(const char * text, Alignment align, Vector2 position, bool editable, bool visibleWhenEmpty){
+inline TextObject::TextObject(std::string text, Alignment align, Vector2 position, bool editable, bool visibleWhenEmpty){
     Text = text;
     Align = align;
     Position = position;
@@ -100,25 +105,38 @@ inline TextObject::TextObject(const char * text, Alignment align, Vector2 positi
 }
 
 
-inline void TextObject::TrySelect(Vector2 CursorPosition, TextCharacters Characters){
+inline void TextObject::TrySelect(Vector2 CursorPosition, bool Shift, TextCharacters Characters){
     float FontHeight = (float)TTF_GetFontHeight(Characters.GetFont());
-    float BasePos = (Characters.GetTotalLength(Text)*((float)Align/2));
-    SDL_FRect TestRange = {Position.x - BasePos-8, Position.y - (FontHeight/2), Characters.GetTotalLength(Text)+16, FontHeight};
+    float TotaLength = Characters.GetTotalLength(Text);
+    float BasePos = (TotaLength*((float)Align/2));
+    SDL_FRect TestRange = {Position.x - BasePos-8, Position.y - (FontHeight/2), TotaLength+16, FontHeight};
     if (Text.length() == 0) TestRange = {Position.x - 8, Position.y - 8, 16, 16};
     if (contained(CursorPosition, TestRange)){
-        Cursor = 0;
         Selected = true;
-        float distance = Characters.GetTotalLength(Text);
+        float distance = TotaLength;
         for (int i = 0; i < Text.length()+1; i++){
             if (CursorPosition.x > (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i)))){
                 distance = abs(CursorPosition.x - (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i))));
             }
             else{
-                Cursor = i-(distance < abs(CursorPosition.x - (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i)))));
-                Selection = 0;
+                if (Shift && Cursor != -1){
+                    Selection = i-(distance < abs(CursorPosition.x - (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i)))))-Cursor;
+                }
+                else{
+                    Cursor = i-(distance < abs(CursorPosition.x - (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i)))));
+                    Selection = 0;
+                }
                 break;
             }
-            if (i == Text.length()-1) Cursor = i+1;
+            if (i == Text.length()-1){
+                if (Shift && Cursor != -1){
+                    Selection = i+1-Cursor;
+                }
+                else{
+                    Cursor = i+1;
+                    Selection = 0;
+                }
+            }
         }
     }
     else{
@@ -128,14 +146,16 @@ inline void TextObject::TrySelect(Vector2 CursorPosition, TextCharacters Charact
 
 
 inline void TextObject::ConTrySelect(Vector2 CursorPosition, TextCharacters Characters){
-    float BasePos = (Characters.GetTotalLength(Text)*((float)Align/2));
-    float distance = Characters.GetTotalLength(Text);
+    float TotaLength = Characters.GetTotalLength(Text);
+    float BasePos = (TotaLength*((float)Align/2));
+    float distance = TotaLength;
     for (int i = 0; i < Text.length()+1; i++){
-        if (CursorPosition.x > (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i)))){
-            distance = abs(CursorPosition.x - (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i))));
+        TotaLength = Characters.GetTotalLength(slice(Text, 0, i));
+        if (CursorPosition.x > (Position.x - BasePos + TotaLength)){
+            distance = abs(CursorPosition.x - (Position.x - BasePos + TotaLength));
         }
         else{
-            Selection = i-(distance < abs(CursorPosition.x - (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i))))) - Cursor;
+            Selection = i-(distance < abs(CursorPosition.x - (Position.x - BasePos + TotaLength))) - Cursor;
             break;
         }
         if (i == Text.length()-1) Selection = i+1 - Cursor;
@@ -166,7 +186,6 @@ inline void TextObject::Edit(std::string InputChars, bool Modifier){
             }
             elif (InputChars == "c"){
                 SDL_SetClipboardText(slice(Text, (Selection<0)?Cursor+Selection:Cursor, (Selection>0)?Cursor+Selection:Cursor).c_str());
-                std::cout << SDL_GetClipboardText() << std::endl;
             }
             elif (InputChars == "x"){
                 if (Selection != 0){
@@ -181,7 +200,7 @@ inline void TextObject::Edit(std::string InputChars, bool Modifier){
         else{
             if (Selection == 0){
                 Text = slice(Text, 0, Cursor)+InputChars+slice(Text, Cursor, Text.length());
-                Cursor+=InputChars.length();
+                Cursor += InputChars.length();
             }
             else{
                 Text = slice(Text, 0, (Selection<0)?Cursor+Selection:Cursor)+InputChars+slice(Text, (Selection>0)?Cursor+Selection:Cursor, Text.length());

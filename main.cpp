@@ -1,7 +1,20 @@
-#include "IncAll.hpp"
-#include "SDL3/SDL_keycode.h"
-#include "SDL3/SDL_video.h"
-#include "SDL3_ttf/SDL_ttf.h"
+#include <iostream>
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+#define _USE_MATH_DEFINES
+#include <algorithm>
+#include "TextHelp.h"
+
+
+#undef min
+#undef max
+#define elif else if
+#ifdef _WIN32
+#define SDL_MODKEY SDL_SCANCODE_LCTRL
+#elifdef __APPLE__
+#define SDL_MODKEY SDL_SCANCODE_LGUI
+#endif
 
 
 /*
@@ -735,9 +748,11 @@ int main(int argc, char* argv[]) {
                     break;
 
 
+
+
                 /* Interact with UI */
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
-                    if (contained(mouse, toolsrect) && !(toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)]=="")) currentool=((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3);
+                    if (contained(mouse, toolsrect) && !(toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)]=="")) currentool=((int)((mouse.x-toolsrect.x-1)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3);
                     colorselectorvisible = (e.button.button == SDL_BUTTON_LMASK && (contained(mouse, leftselectedcolorect) || contained(mouse, rightselectedcolorect) || (contained(mouse, colorselectorui) && colorselectorvisible)));
                     if (colorselectorvisible && !contained(mouse, colorselectorui) && e.button.button == SDL_BUTTON_LMASK) {
                         leftcolorchanging = contained(mouse, leftselectedcolorect);
@@ -753,9 +768,11 @@ int main(int argc, char* argv[]) {
                         }
                         SDL_SetRenderTarget(renderer, NULL);
                     }
-                    Title.TrySelect(mouse, Characters);
+                    Title.TrySelect(mouse, keystates[SDL_SCANCODE_LSHIFT], Characters);
                     lastmouse = mouse;
                     break;
+
+
 
 
                 /* Update canvas */
@@ -837,6 +854,8 @@ int main(int argc, char* argv[]) {
                     }
 
 
+
+
                     /* Reset canvas size */
                     if (e.key.key == SDLK_0) {
                         canvas = (SDL_FRect){ canvascenter.x-(canvasize.x/2), canvascenter.y-(canvasize.y/2), canvasize.x, canvasize.y };
@@ -849,6 +868,8 @@ int main(int argc, char* argv[]) {
                         canvasborders[6].position = (SDL_FPoint){ canvas.x+canvas.w, canvas.y+canvas.h };
                         canvasborders[7].position = (SDL_FPoint){ precanvas.x+precanvas.w, precanvas.y+precanvas.h };
                     }
+
+
 
 
                     /* Change title text */
@@ -864,11 +885,15 @@ int main(int argc, char* argv[]) {
                     break;
 
 
+
+
                 case SDL_EVENT_TEXT_INPUT:
                     Title.Edit(e.text.text, false);
                     break;
             }
         }
+
+
 
 
         /* Update canvas texture if necessary */
@@ -1083,10 +1108,10 @@ int main(int argc, char* argv[]) {
         SDL_RenderFillRect(renderer, &nameborder);
 
 
-        /* Render UI */ //FIX!1!////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /* Render UI */
         if (contained(mouse, toolsrect) && toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)] != "") {
             SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
-            toolselectedrect = (SDL_FRect){(float)((int)((mouse.x-toolsrect.x)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.x, (float)((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.y, toolselectedrect.w, toolselectedrect.h };
+            toolselectedrect = (SDL_FRect){((int)((mouse.x-toolsrect.x-1)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.x, ((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*(toolsrect.w/3))+toolsrect.y, toolselectedrect.w, toolselectedrect.h };
             SDL_RenderFillRect(renderer, &toolselectedrect);
         }
         toolshoveredrect.x=(currentool%3)*((toolsrect.w)/3)+toolsrect.x;
