@@ -1,3 +1,4 @@
+#include "SDL3/SDL_mouse.h"
 #include <iostream>
 #ifdef _WIN32
 #include <Windows.h>
@@ -283,6 +284,23 @@ fvec3 HSVfRGB(int r, int g, int b) {
 }
 
 
+std::string HEXfRGBA(int r, int g, int b, int a){
+    std::string conv = "0123456789ABCDEF";
+    return std::string() + conv[(int)(r/16)]+conv[(r%16)]+conv[(int)(g/16)]+conv[(int)(g%16)]+conv[(int)(b/16)]+conv[(int)(b%16)]+conv[(int)(a/16)]+conv[(int)(a%16)];
+}
+
+
+SDL_Color RGBAfHEX(std::string hex){
+    std::string conv = "0123456789ABCDEF";
+    return {(Uint8)((conv.find(hex[0])*16)+conv.find(hex[1])), (Uint8)((conv.find(hex[2])*16)+conv.find(hex[3])), (Uint8)((conv.find(hex[4])*16)+conv.find(hex[5])), (Uint8)((conv.find(hex[6])*16)+conv.find(hex[7]))};
+}
+
+
+bool SDL_ColorSame(SDL_Color a, SDL_Color b){
+    return a.r==b.r&&a.g==b.g&&a.b==b.b&&a.a==b.a;
+}
+
+
 /* Main! */
 int main(int argc, char* argv[]) {
     /* Set os variable */
@@ -315,6 +333,7 @@ int main(int argc, char* argv[]) {
     /* Initialize SDL_ttf, create font object */
     TTF_Init();
     TTF_Font * font = TTF_OpenFont((SDL_GetBasePath()+rpath+"Font.ttf").c_str(), 26);
+    TTF_Font * smallfont = TTF_OpenFont((SDL_GetBasePath()+rpath+"Font.ttf").c_str(), 14);
     // int kerning;
     // TTF_GetGlyphKerning(font, (int)'k', (int)'e', &kerning);
     // SDL_SetWindowTitle(window, std::to_string(kerning).c_str());
@@ -323,11 +342,13 @@ int main(int argc, char* argv[]) {
 
     /* Init text assistant :) */
     TextCharacters Characters = {renderer, font, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890,.~!@#$%^&*()_+-=:;\"'? "};
+    TextCharacters SmallCharacters = {renderer, smallfont, "1234567890ABCDEFabcdef#"};
 
 
     /* Create text objects */
-    TextObject Title = {"New Piskel", Center, Vector2(windowsize.x/2, 18), true, true};
-    TextObject CurSizeText = {"1x", Center, Vector2(cursizerectborder.x/2, (cursizerectborder.y+cursizerectborder.h)), false, true};
+    TextObject Title = {"New Piskel", Center, Center, Vector2((float)windowsize.x/2, 18), {255, 255, 255, 255}, true};
+    TextObject CurSizeText = {"1x", Center, Center, Vector2(cursizerectborder.x/2, (cursizerectborder.y+cursizerectborder.h)), {255, 255, 255, 255}, false};
+    TextObject ColorHex = {"#00000000", Center, Center, Vector2(150, 460), {255, 255, 255, 255}, true, true, 1, 0};
 
 
     /* Load textures */
@@ -569,7 +590,7 @@ int main(int argc, char* argv[]) {
 
                     /* Reset ui */
                     nameborder.w = windowsize.x;
-                    Title.Position = Vector2(windowsize.x/2, Title.Position.y);
+                    Title.Position = Vector2((float)windowsize.x/2, Title.Position.y);
 
 
                     /* Reset canvas */
@@ -752,8 +773,10 @@ int main(int argc, char* argv[]) {
 
                 /* Interact with UI */
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    Title.TrySelect(mouse, keystates[SDL_SCANCODE_LSHIFT], Characters);
+                    ColorHex.TrySelect(mouse, keystates[SDL_SCANCODE_LSHIFT], SmallCharacters);
                     if (contained(mouse, toolsrect) && !(toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)]=="")) currentool=((int)((mouse.x-toolsrect.x-1)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3);
-                    colorselectorvisible = (e.button.button == SDL_BUTTON_LMASK && (contained(mouse, leftselectedcolorect) || contained(mouse, rightselectedcolorect) || (contained(mouse, colorselectorui) && colorselectorvisible)));
+                    colorselectorvisible = (e.button.button == SDL_BUTTON_LMASK && (contained(mouse, leftselectedcolorect) || contained(mouse, rightselectedcolorect) || (contained(mouse, colorselectorui) && colorselectorvisible) || ColorHex.Selected));
                     if (colorselectorvisible && !contained(mouse, colorselectorui) && e.button.button == SDL_BUTTON_LMASK) {
                         leftcolorchanging = contained(mouse, leftselectedcolorect);
                         fvec3 tempvecolor = (leftcolorchanging)?HSVfRGB(leftcolor.r, leftcolor.g, leftcolor.b):HSVfRGB(rightcolor.r, rightcolor.g, rightcolor.b);
@@ -768,7 +791,6 @@ int main(int argc, char* argv[]) {
                         }
                         SDL_SetRenderTarget(renderer, NULL);
                     }
-                    Title.TrySelect(mouse, keystates[SDL_SCANCODE_LSHIFT], Characters);
                     lastmouse = mouse;
                     break;
 
@@ -841,15 +863,19 @@ int main(int argc, char* argv[]) {
                         }
                         elif (e.key.key == SDLK_A){
                             Title.Edit("a", keystates[SDL_MODKEY], Characters);
+                            ColorHex.Edit("a", keystates[SDL_MODKEY], SmallCharacters);
                         }
                         elif (e.key.key == SDLK_C){
                             Title.Edit("c", keystates[SDL_MODKEY], Characters);
+                            ColorHex.Edit("c", keystates[SDL_MODKEY], SmallCharacters);
                         }
                         elif (e.key.key == SDLK_X){
                             Title.Edit("x", keystates[SDL_MODKEY], Characters);
+                            ColorHex.Edit("x", keystates[SDL_MODKEY], SmallCharacters);
                         }
                         elif (e.key.key == SDLK_V){
                             Title.Edit("v", keystates[SDL_MODKEY], Characters);
+                            ColorHex.Edit("v", keystates[SDL_MODKEY], SmallCharacters);
                         }
                     }
 
@@ -875,12 +901,15 @@ int main(int argc, char* argv[]) {
                     /* Change title text */
                     if (e.key.key == SDLK_DELETE || e.key.key == SDLK_BACKSPACE){
                         Title.Delete(e.key.key == SDLK_DELETE);
+                        ColorHex.Delete(e.key.key == SDLK_DELETE);
                     }
                     if (e.key.key == SDLK_LEFT){
                         Title.MoveCursor(keystates[SDL_SCANCODE_LSHIFT] || keystates[SDL_SCANCODE_RSHIFT], keystates[SDL_SCANCODE_LCTRL] || keystates[SDL_SCANCODE_RCTRL], true);
+                        ColorHex.MoveCursor(keystates[SDL_SCANCODE_LSHIFT] || keystates[SDL_SCANCODE_RSHIFT], keystates[SDL_SCANCODE_LCTRL] || keystates[SDL_SCANCODE_RCTRL], true);
                     }
                     elif (e.key.key == SDLK_RIGHT){
                         Title.MoveCursor(keystates[SDL_SCANCODE_LSHIFT] || keystates[SDL_SCANCODE_RSHIFT], keystates[SDL_SCANCODE_LCTRL] || keystates[SDL_SCANCODE_RCTRL], false);
+                        ColorHex.MoveCursor(keystates[SDL_SCANCODE_LSHIFT] || keystates[SDL_SCANCODE_RSHIFT], keystates[SDL_SCANCODE_LCTRL] || keystates[SDL_SCANCODE_RCTRL], false);
                     }
                     break;
 
@@ -889,6 +918,7 @@ int main(int argc, char* argv[]) {
 
                 case SDL_EVENT_TEXT_INPUT:
                     Title.Edit(e.text.text, false, Characters);
+                    ColorHex.Edit(e.text.text, false, SmallCharacters);
                     break;
             }
         }
@@ -1040,8 +1070,9 @@ int main(int argc, char* argv[]) {
         }
 
 
-        if (mousebitmask & SDL_BUTTON_LMASK && Title.Selected){
+        if (mousebitmask & SDL_BUTTON_LMASK){
             Title.ConTrySelect(mouse, Characters);
+            ColorHex.ConTrySelect(mouse, SmallCharacters);
         }
 
 
@@ -1129,11 +1160,15 @@ int main(int argc, char* argv[]) {
         ((contained(mouse, rightselectedcolorect) && !(mousebitmask & SDL_BUTTON_LMASK)) || (!leftcolorchanging && colorselectorvisible))?SDL_SetRenderDrawColor(renderer, 136, 136, 136, 255):SDL_SetRenderDrawColor(renderer, 68, 68, 68, 255);
         SDL_RenderFillRect(renderer, &rightselectedcolorect);
         SDL_SetRenderDrawColor(renderer, leftcolor.r, leftcolor.g, leftcolor.b, leftcolor.a);
+        ColorHex.Mod.a = colorselectorvisible*255;
+        ColorHex.Editable = colorselectorvisible;
         if (colorselectorvisible) {
             colorselectorui = (SDL_FRect){ std::round(colorselectorui.x), std::round(colorselectorui.y), colorselectorui.w, colorselectorui.h };
             SDL_RenderTexture(renderer, colorselector, NULL, &colorselectorui);
+            bool change = false;
             if (mousebitmask & SDL_BUTTON_LMASK) {
                 if (contained(lastmouse, colorselectelements[0])) {
+                    change = true;
                     HSVA.w = limit((mouse.y-colorselectelements[0].y)*(360/colorselectelements[0].h), 0, 360);
                     SDL_SetRenderTarget(renderer, colorselector);
                     for (int y = 0; y < 90; y++){
@@ -1146,13 +1181,19 @@ int main(int argc, char* argv[]) {
                     SDL_SetRenderTarget(renderer, NULL);
                 }
                 else if (contained(lastmouse, colorselectelements[1])) {
+                    change = true;
                     HSVA.x = limit((mouse.x-colorselectelements[1].x)/colorselectelements[1].w, 0, 1);
                     HSVA.y = limit(1-(mouse.y-colorselectelements[1].y)/colorselectelements[1].h, 0, 1);
                 }
                 else if (contained(lastmouse, colorselectelements[2])) {
+                    change = true;
                     HSVA.z = limit(1-((mouse.y-colorselectelements[0].y)/colorselectelements[0].h), 0, 1);
                 }
-                tempcolor = RGBfHSV(HSVA.w, HSVA.x, HSVA.y);
+                if (change){
+                    tempcolor = RGBfHSV(HSVA.w, HSVA.x, HSVA.y);
+                    ColorHex.Text = "#"+HEXfRGBA(tempcolor.r, tempcolor.g, tempcolor.b, HSVA.z*255);
+                }
+
                 if (leftcolorchanging) leftcolor = (SDL_Color){ tempcolor.r, tempcolor.g, tempcolor.b, (Uint8)(HSVA.z*255) };
                 else rightcolor = (SDL_Color){ tempcolor.r, tempcolor.g, tempcolor.b, (Uint8)(HSVA.z*255) };
                 leftcoloralphapreview[0].color = (SDL_FColor){ (float)leftcolor.r/255, (float)leftcolor.g/255, (float)leftcolor.b/255, (float)leftcolor.a/255 };
@@ -1168,6 +1209,7 @@ int main(int argc, char* argv[]) {
                 rightcolorpreview[1].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1 };
                 rightcolorpreview[2].color = (SDL_FColor){ (float)rightcolor.r/255, (float)rightcolor.g/255, (float)rightcolor.b/255, 1 };
             }
+            elif(!SDL_ColorSame(RGBAfHEX(slice(ColorHex.Text, 1, 8)), tempcolor)){ tempcolor = RGBAfHEX(slice(ColorHex.Text, 1, 8)); }
             colorselectoruitemsrects[0] = (SDL_FRect){ colorselectorui.x+colorselectorui.w-34, (float)(int)(colorselectorui.y+7+((HSVA.w/360)*90)), colorselectoruitemsrects[0].w, colorselectoruitemsrects[0].h };
             SDL_RenderTexture(renderer, colorselectoruitems[0], NULL, &colorselectoruitemsrects[0]);
             colorselectoruitemsrects[3] = (SDL_FRect){ (float)(int)(colorselectorui.x+colorselectorui.w-136+(HSVA.x*90)), (float)(int)(colorselectorui.y+6+((1-HSVA.y)*90)), colorselectoruitemsrects[3].w, colorselectoruitemsrects[3].h };
@@ -1189,6 +1231,7 @@ int main(int argc, char* argv[]) {
         /* Render UI text */
         CurSizeText.Render(renderer, Characters);
         Title.Render(renderer, Characters);
+        ColorHex.Render(renderer, SmallCharacters);
         SDL_SetWindowTitle(window, ("RePiskel - " + Title.Text).c_str());
 
 

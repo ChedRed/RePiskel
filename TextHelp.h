@@ -1,5 +1,6 @@
 #pragma once
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_render.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include <string>
 #include <vector>
@@ -8,9 +9,11 @@
 #define elif else if
 
 typedef int Alignment;
+#define Top 0
 #define Left 0
-#define Center 1
 #define Right 2
+#define Bottom 2
+#define Center 1
 
 
 // Character cache
@@ -64,9 +67,7 @@ inline float TextCharacters::GetTotalLength(std::string characters){
 
 inline std::string TextCharacters::KeepValid(std::string value){
     std::string returnv = "";
-    for (int i = 0; i < value.length(); i++){
-        if (Charin.find(value[i]) != std::string::npos) returnv += value[i];
-    }
+    for (int i = 0; i < value.length(); i++) (Charin.contains(value[i])?returnv += value[i]:"");
     return returnv;
 }
 
@@ -84,7 +85,7 @@ inline TTF_Font * TextCharacters::GetFont(){
 // Actual object to render text
 class TextObject{
 public:
-TextObject(std::string text, Alignment align, Vector2 position, bool editable, bool visibleWhenEmpty);
+TextObject(std::string text, Alignment horizontal, Alignment vertical, Vector2 position, SDL_Color mod, bool editable, bool visibleWhenEmpty = true, int editStart = 0, int editEnd = 0);
 void Render(SDL_Renderer * renderer, TextCharacters Characters);
 void MoveCursor(bool Shift, bool Control, bool MoveLeft);
 void Edit(std::string InputChars, bool Modifier, TextCharacters Characters);
@@ -92,24 +93,34 @@ void Delete(bool Reverse);
 void Destroy();
 void TrySelect(Vector2 CursorPosition, bool Shift, TextCharacters Characters);
 void ConTrySelect(Vector2 CursorPosition, TextCharacters Characters);
+void ChangeHorizontalAlignment(Alignment horizontal, TextCharacters Characters);
+void ChangeVerticalAlignment(Alignment vertical, TextCharacters Characters);
 bool Editable;
+int EditStart = 0;
+int EditEnd = 0;
 bool VisibleWhenEmpty;
 bool Selected = false;
 std::string Text;
-Alignment Align;
+Alignment Horizontal;
+Alignment Vertical;
 Vector2 Position;
+SDL_Color Mod;
 private:
 int Cursor;
 int Selection;
 };
 
 
-inline TextObject::TextObject(std::string text, Alignment align, Vector2 position, bool editable, bool visibleWhenEmpty){
+inline TextObject::TextObject(std::string text, Alignment horizontal, Alignment vertical, Vector2 position, SDL_Color mod, bool editable, bool visibleWhenEmpty, int editStart, int editEnd){
     Text = text;
-    Align = align;
+    Horizontal = horizontal;
+    Vertical = vertical;
     Position = position;
     Editable = editable;
+    EditStart = editStart;
+    EditEnd = editEnd;
     VisibleWhenEmpty = visibleWhenEmpty;
+    Mod = mod;
     Cursor = -1;
     Selection = 0;
 }
@@ -118,11 +129,10 @@ inline TextObject::TextObject(std::string text, Alignment align, Vector2 positio
 inline void TextObject::TrySelect(Vector2 CursorPosition, bool Shift, TextCharacters Characters){
     float FontHeight = (float)TTF_GetFontHeight(Characters.GetFont());
     float TotaLength = Characters.GetTotalLength(Text);
-    float BasePos = (TotaLength*((float)Align/2));
-    SDL_FRect TestRange = {Position.x - BasePos-8, Position.y - (FontHeight/2), TotaLength+16, FontHeight};
+    float BasePos = (TotaLength*((float)Horizontal/2));
+    SDL_FRect TestRange = {Position.x - BasePos-8, Position.y - (FontHeight*((float)Vertical/2)), TotaLength+16, FontHeight};
     if (Text.length() == 0) TestRange = {Position.x - 8, Position.y - 8, 16, 16};
     if (contained(CursorPosition, TestRange)){
-        Selected = true;
         float distance = TotaLength;
         for (int i = 0; i < Text.length()+1; i++){
             if (CursorPosition.x > (Position.x - BasePos + Characters.GetTotalLength(slice(Text, 0, i)))){
@@ -148,6 +158,7 @@ inline void TextObject::TrySelect(Vector2 CursorPosition, bool Shift, TextCharac
                 }
             }
         }
+        Selected = inlimit(Cursor, EditStart, Text.length()-EditEnd+1);
     }
     else{
         Selected = false;
@@ -156,19 +167,27 @@ inline void TextObject::TrySelect(Vector2 CursorPosition, bool Shift, TextCharac
 
 
 inline void TextObject::ConTrySelect(Vector2 CursorPosition, TextCharacters Characters){
-    float TotaLength = Characters.GetTotalLength(Text);
-    float BasePos = (TotaLength*((float)Align/2));
-    float distance = TotaLength;
-    for (int i = 0; i < Text.length()+1; i++){
-        TotaLength = Characters.GetTotalLength(slice(Text, 0, i));
-        if (CursorPosition.x > (Position.x - BasePos + TotaLength)){
-            distance = abs(CursorPosition.x - (Position.x - BasePos + TotaLength));
+    if (Selected){
+        float TotaLength = Characters.GetTotalLength(Text);
+        float BasePos = (TotaLength*((float)Horizontal/2));
+        float distance = TotaLength;
+        for (int i = 0; i < Text.length()+1; i++){
+            TotaLength = Characters.GetTotalLength(slice(Text, 0, i));
+            if (CursorPosition.x > (Position.x - BasePos + TotaLength)){
+                distance = abs(CursorPosition.x - (Position.x - BasePos + TotaLength));
+            }
+            else{
+                Selection = i-(distance < abs(CursorPosition.x - (Position.x - BasePos + TotaLength))) - Cursor;
+                break;
+            }
+            if (i == Text.length()-1) Selection = i+1 - Cursor;
         }
-        else{
-            Selection = i-(distance < abs(CursorPosition.x - (Position.x - BasePos + TotaLength))) - Cursor;
-            break;
+        if (Cursor+Selection < EditStart){
+            Selection = EditStart-Cursor;
         }
-        if (i == Text.length()-1) Selection = i+1 - Cursor;
+        if (Cursor+Selection > Text.length()-EditEnd){
+            Selection = Text.length()-EditEnd-Cursor;
+        }
     }
 }
 
@@ -178,9 +197,16 @@ inline void TextObject::MoveCursor(bool Shift, bool Control, bool MoveLeft){
         if (Shift){
             Selection -= (MoveLeft-0.5)*2;
             Selection = limit(Selection, -Cursor, Text.length()-Cursor);
+            if (Cursor+Selection < EditStart){
+                Selection = EditStart-Cursor;
+            }
+            if (Cursor+Selection > Text.length()-EditEnd){
+                Selection = Text.length()-EditEnd-Cursor;
+            }
         }
         else{
             Cursor -= (MoveLeft-0.5)*2 - Selection;
+            Cursor = limit(Cursor, EditStart, Text.length()-EditEnd);
             Selection = 0;
         }
     }
@@ -193,8 +219,8 @@ inline void TextObject::Edit(std::string InputChars, bool Modifier, TextCharacte
     if (Selected){
         if (Modifier){
             if (InputChars == "a"){
-                Cursor = 0;
-                Selection = Text.length();
+                Cursor = EditStart;
+                Selection = Text.length()-EditEnd-Cursor;
             }
             elif (InputChars == "c"){
                 SDL_SetClipboardText(slice(Text, (Selection<0)?Cursor+Selection:Cursor, (Selection>0)?Cursor+Selection:Cursor).c_str());
@@ -228,11 +254,13 @@ inline void TextObject::Delete(bool Reverse){
     if (Selected){
         if (Selection == 0){
             if (Reverse){
-                Text = slice(Text, 0, Cursor)+slice(Text, Cursor+1, Text.length());
+                if (Cursor<Text.length()-EditEnd) Text = slice(Text, 0, Cursor)+slice(Text, Cursor+1, Text.length());
             }
             else{
-                Text = slice(Text, 0, Cursor-1)+slice(Text, Cursor, Text.length());
-                Cursor--;
+                if (Cursor>EditStart){
+                    Text = slice(Text, 0, Cursor-1)+slice(Text, Cursor, Text.length());
+                    Cursor--;
+                }
             }
         }
         else{
@@ -244,13 +272,28 @@ inline void TextObject::Delete(bool Reverse){
 }
 
 
+inline void TextObject::ChangeHorizontalAlignment(Alignment horizontal, TextCharacters Characters){
+    float FontWidth = Characters.GetTotalLength(Text);
+    Position.x += (FontWidth*((float)horizontal/2)) - (FontWidth*((float)Horizontal/2));
+    Horizontal = horizontal;
+}
+
+
+inline void TextObject::ChangeVerticalAlignment(Alignment vertical, TextCharacters Characters){
+    float FontHeight = (float)TTF_GetFontHeight(Characters.GetFont());
+    Position.y += ((FontHeight/2) + (FontHeight*((float)vertical/2))) - ((FontHeight/2) + (FontHeight*((float)Vertical/2)));
+    Vertical = vertical;
+}
+
+
 inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Characters){
     float FontHeight = (float)TTF_GetFontHeight(Characters.GetFont());
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_Texture * curchar;
     SDL_FRect charect;
-    charect.x = Position.x - (Characters.GetTotalLength(Text)*((float)Align/2));
-    charect.y = Position.y - FontHeight/2;
+    charect.x = Position.x - (Characters.GetTotalLength(Text)*((float)Horizontal/2));
+    charect.y = Position.y - (FontHeight*((float)Vertical/2));
+    // Render editing stuffs like text cursor
     if (Selected && Editable){
         Cursor = limit(Cursor, 0, Text.length());
         if (Text.length() == 0){
@@ -276,9 +319,13 @@ inline void TextObject::Render(SDL_Renderer * renderer, TextCharacters Character
         Cursor = -1;
         Selection = 0;
     }
+
+    // Render text!1!
     int kerning;
     for (int i = 0; i < Text.length(); i++){
         curchar = Characters.GetCharacter(std::string() + Text[i]);
+        SDL_SetTextureColorMod(curchar, Mod.r, Mod.g, Mod.b);
+        SDL_SetTextureAlphaMod(curchar, Mod.a);
         SDL_GetTextureSize(curchar, &charect.w, &charect.h);
         SDL_RenderTexture(renderer, curchar, NULL, &charect);
         TTF_GetGlyphKerning(Characters.GetFont(), (int)Text[i], (int)Text[i+1], &kerning);
