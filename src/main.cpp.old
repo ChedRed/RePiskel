@@ -1,4 +1,3 @@
-#include "SDL3/SDL_mouse.h"
 #include <iostream>
 #ifdef _WIN32
 #include <Windows.h>
@@ -13,7 +12,7 @@
 #define elif else if
 #ifdef _WIN32
 #define SDL_MODKEY SDL_SCANCODE_LCTRL
-#elifdef __APPLE__
+#else
 #define SDL_MODKEY SDL_SCANCODE_LGUI
 #endif
 
@@ -78,7 +77,7 @@ SDL_FRect nameborder = { 0, 0, (float)windowsize.x, 36 };
 
 /* Canvas */
 bool edited = false;
-Vector2 resolution = { 16, 16 };
+Vector2 resolution = { 12, 12 };
 Vector2 drawresolution = { 0, 0 };
 Vector2 resratio = Vector2((resolution.x<resolution.y)?(float)resolution.x/resolution.y:1, (resolution.x>resolution.y)?(float)resolution.y/resolution.x:1);
 Vector2 canvascenter = Vector2((margin.a/2)+((windowsize.x-margin.b)/2), (22)+(((float)windowsize.y-8)/2));
@@ -304,17 +303,11 @@ bool SDL_ColorSame(SDL_Color a, SDL_Color b){
 /* Main! */
 int main(int argc, char* argv[]) {
     /* Set os variable */
-    #ifdef _WIN32
-    os = 1;
-    #elifdef __APPLE__
-    os = 2;
-    #elifdef __linux__
-    os = 3;
+    #ifdef __APPLE__
+    SourcePath = "Content/";
+    #else
+    SourcePath = "Resources/Content/";
     #endif
-
-
-    if (os == 1) rpath = "./";
-    elif (os == 2) rpath = "../Resources/";
 
 
     undotextures.resize(1);
@@ -341,14 +334,14 @@ int main(int argc, char* argv[]) {
 
 
     /* Init text assistant :) */
-    TextCharacters Characters = {renderer, font, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890,.~!@#$%^&*()_+-=:;\"'? "};
-    TextCharacters SmallCharacters = {renderer, smallfont, "1234567890ABCDEFabcdef#"};
+    TextCharacters * Characters = new TextCharacters(renderer, font, false, "0123456789x");
+    TextCharacters * SmallCharacters = new TextCharacters(renderer, smallfont, false, "#0123456789ABCDEF");
 
 
     /* Create text objects */
-    TextObject Title = {"New Piskel", Center, Center, Vector2((float)windowsize.x/2, 18), {255, 255, 255, 255}, true};
-    TextObject CurSizeText = {"1x", Center, Center, Vector2(cursizerectborder.x/2, (cursizerectborder.y+cursizerectborder.h)), {255, 255, 255, 255}, false};
-    TextObject ColorHex = {"#00000000", Center, Center, Vector2(150, 460), {255, 255, 255, 255}, true, true, 1, 0};
+    TextObject Title = TextObject("New Piskel", Characters, A_Center, A_Center, Vector2((float)windowsize.x/2, 18), {255, 255, 255, 255}, true);
+    TextObject CurSizeText = TextObject("1x", Characters, A_Center, A_Center, Vector2(cursizerectborder.x/2, (cursizerectborder.y+cursizerectborder.h)), {255, 255, 255, 255}, false);
+    TextObject ColorHex = TextObject("#00000000", SmallCharacters, A_Center, A_Center, Vector2(150, 460), {255, 255, 255, 255}, true, true, 1, 0);
 
 
     /* Load textures */
@@ -483,7 +476,7 @@ int main(int argc, char* argv[]) {
     SDL_SetTextureScaleMode(rightcolorselector, SDL_SCALEMODE_NEAREST);
     SDL_GetTextureSize(presprite, &spriterect.w, &spriterect.h);
     spriterect = (SDL_FRect){0, 0, spriterect.w, spriterect.h };
-    CurSizeText.Position = Vector2(cursizerectborder.x+(cursizerectborder.w/2), cursizerectborder.y+cursizerectborder.h-((float)TTF_GetFontHeight(Characters.GetFont())/2));
+    CurSizeText.Position = Vector2(cursizerectborder.x+(cursizerectborder.w/2), cursizerectborder.y+cursizerectborder.h-((float)TTF_GetFontHeight(font)/2));
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
 
@@ -622,7 +615,7 @@ int main(int argc, char* argv[]) {
                     leftcoloralphapreview[1].position.y=leftselectedcolorealrect.y;
                     leftcoloralphapreview[2].position.x=leftselectedcolorealrect.x;
                     leftcoloralphapreview[2].position.y=leftselectedcolorealrect.y+leftselectedcolorealrect.h;
-                    leftcolorpreview[0].position.x=leftselectedcolorealrect.x+leftselectedcolorealrect.w;
+                    leftcolorpmain.cpp.oldreview[0].position.x=leftselectedcolorealrect.x+leftselectedcolorealrect.w;
                     leftcolorpreview[0].position.y=leftselectedcolorealrect.y;
                     leftcolorpreview[1].position.x=leftselectedcolorealrect.x+leftselectedcolorealrect.w;
                     leftcolorpreview[1].position.y=leftselectedcolorealrect.y+leftselectedcolorealrect.h;
@@ -773,8 +766,8 @@ int main(int argc, char* argv[]) {
 
                 /* Interact with UI */
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
-                    Title.TrySelect(mouse, keystates[SDL_SCANCODE_LSHIFT], Characters);
-                    ColorHex.TrySelect(mouse, keystates[SDL_SCANCODE_LSHIFT], SmallCharacters);
+                    Title.TrySelect(mouse, keystates[SDL_SCANCODE_LSHIFT]);
+                    ColorHex.TrySelect(mouse, keystates[SDL_SCANCODE_LSHIFT]);
                     if (contained(mouse, toolsrect) && !(toolnames[((int)((mouse.x-toolsrect.x)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3)]=="")) currentool=((int)((mouse.x-toolsrect.x-1)/(toolsrect.w/3)))+((int)((mouse.y-toolsrect.y)/(toolsrect.w/3))*3);
                     colorselectorvisible = (e.button.button == SDL_BUTTON_LMASK && (contained(mouse, leftselectedcolorect) || contained(mouse, rightselectedcolorect) || (contained(mouse, colorselectorui) && colorselectorvisible) || ColorHex.Selected));
                     if (colorselectorvisible && !contained(mouse, colorselectorui) && e.button.button == SDL_BUTTON_LMASK) {
@@ -862,20 +855,20 @@ int main(int argc, char* argv[]) {
                             }
                         }
                         elif (e.key.key == SDLK_A){
-                            Title.Edit("a", keystates[SDL_MODKEY], Characters);
-                            ColorHex.Edit("a", keystates[SDL_MODKEY], SmallCharacters);
+                            Title.Edit("a", keystates[SDL_MODKEY]);
+                            ColorHex.Edit("a", keystates[SDL_MODKEY]);
                         }
                         elif (e.key.key == SDLK_C){
-                            Title.Edit("c", keystates[SDL_MODKEY], Characters);
-                            ColorHex.Edit("c", keystates[SDL_MODKEY], SmallCharacters);
+                            Title.Edit("c", keystates[SDL_MODKEY]);
+                            ColorHex.Edit("c", keystates[SDL_MODKEY]);
                         }
                         elif (e.key.key == SDLK_X){
-                            Title.Edit("x", keystates[SDL_MODKEY], Characters);
-                            ColorHex.Edit("x", keystates[SDL_MODKEY], SmallCharacters);
+                            Title.Edit("x", keystates[SDL_MODKEY]);
+                            ColorHex.Edit("x", keystates[SDL_MODKEY]);
                         }
                         elif (e.key.key == SDLK_V){
-                            Title.Edit("v", keystates[SDL_MODKEY], Characters);
-                            ColorHex.Edit("v", keystates[SDL_MODKEY], SmallCharacters);
+                            Title.Edit("v", keystates[SDL_MODKEY]);
+                            ColorHex.Edit("v", keystates[SDL_MODKEY]);
                         }
                     }
 
@@ -917,8 +910,8 @@ int main(int argc, char* argv[]) {
 
 
                 case SDL_EVENT_TEXT_INPUT:
-                    Title.Edit(e.text.text, false, Characters);
-                    ColorHex.Edit(e.text.text, false, SmallCharacters);
+                    Title.Edit(e.text.text, false);
+                    ColorHex.Edit(e.text.text, false);
                     break;
             }
         }
@@ -1071,8 +1064,8 @@ int main(int argc, char* argv[]) {
 
 
         if (mousebitmask & SDL_BUTTON_LMASK){
-            Title.ConTrySelect(mouse, Characters);
-            ColorHex.ConTrySelect(mouse, SmallCharacters);
+            Title.ConTrySelect(mouse);
+            ColorHex.ConTrySelect(mouse);
         }
 
 
@@ -1229,9 +1222,9 @@ int main(int argc, char* argv[]) {
 
 
         /* Render UI text */
-        CurSizeText.Render(renderer, Characters);
-        Title.Render(renderer, Characters);
-        ColorHex.Render(renderer, SmallCharacters);
+        CurSizeText.Render(renderer);
+        Title.Render(renderer);
+        ColorHex.Render(renderer);
         SDL_SetWindowTitle(window, ("RePiskel - " + Title.Text).c_str());
 
 
